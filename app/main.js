@@ -1,25 +1,31 @@
 const readline = require("readline");
-const { start } = require("repl");
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
-  prompt: "$ ",
 });
-
-function startREPL() {
-  rl.prompt();
-  rl.on("line", (command) => {
-    const words = command.split(" ");
-    const firstWord = words[0];
-    if (command == "exit 0") {
+// Uncomment this block to pass the first stage
+const types = ['echo', 'exit', 'type'];
+let recursive = function() {
+  rl.question("$ ", (answer) => {
+    const [commandType, text] = answer.split(' ');
+    if(commandType.startsWith('type')) {
+      if(types.includes(text)) {
+        console.log(`${text} is a shell builtin`);
+      } else {
+        console.log(`${text}: not found`);
+      }
+      recursive();
+    } else if (answer === 'exit 0') {
       rl.close();
-    } else if (firstWord == "echo") {
-      console.log(words.slice(1).join(" "));
-      rl.prompt();
+      return;
+    } else if(commandType.startsWith('echo')) {
+      const echoText = answer.split('echo ');
+      console.log(echoText[1]);
+      recursive();
     } else {
-      console.log(`${command}: command not found`);
-      rl.prompt();
+      console.log(`${answer}: command not found`);
+      recursive();
     }
-  });
-}
-startREPL();
+  })
+};
+recursive();
