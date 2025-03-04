@@ -1,31 +1,79 @@
 const readline = require("readline");
+const fs = require("fs");
+const path = require("path");
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
+  prompt: "$ "
 });
-// Uncomment this block to pass the first stage
-const types = ['echo', 'exit', 'type'];
-let recursive = function() {
-  rl.question("$ ", (answer) => {
-    const [commandType, text] = answer.split(' ');
-    if(commandType.startsWith('type')) {
-      if(types.includes(text)) {
-        console.log(`${text} is a shell builtin`);
-      } else {
-        console.log(`${text}: not found`);
-      }
-      recursive();
-    } else if (answer === 'exit 0') {
-      rl.close();
-      return;
-    } else if(commandType.startsWith('echo')) {
-      const echoText = answer.split('echo ');
-      console.log(echoText[1]);
-      recursive();
-    } else {
-      console.log(`${answer}: command not found`);
-      recursive();
+
+const BUILTINS = ["type", "echo", "exit"];
+
+rl.prompt();
+
+rl.on("line", (input) => {
+  input = input.trim();
+  executeCommand(input);
+  rl.prompt();
+});
+
+function executeCommand(command) {
+  const { cmd, args } = parseCommand(command);
+  
+  switch (cmd) {
+    case "exit":
+      process.exit(0);
+      break;
+    case "echo":
+      echoCommand(args);
+      break;
+    case "type":
+      typeCommand(args[0]);
+      break;
+    default:
+      console.log(`${cmd}: command not found`);
+  }
+}
+
+function parseCommand(input) {
+  const args = input.split(/\s+/);
+  const cmd = args.shift();
+  return { cmd, args };
+}
+
+function echoCommand(args) {
+  if (args.length === 0) {
+    console.log("No message provided");
+  } else {
+    console.log(args.join(" "));
+  }
+}
+
+function typeCommand(cmdName) {
+  if (!cmdName) {
+    console.log("No command name provided");
+    return;
+  }
+
+  if (BUILTINS.includes(cmdName)) {
+    console.log(`${cmdName} is a shell builtin`);
+    return;
+  }
+
+  const paths = process.env.PATH.split(path.delimiter);
+  let found = false;
+  
+  for (let dir of paths) {
+    const fullPath = path.join(dir, cmdName);
+    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+      console.log(`${cmdName} is ${fullPath}`);
+      found = true;
+      break;
     }
-  })
-};
-recursive();
+  }
+
+  if (!found) {
+    console.log(`${cmdName}: not found`);
+  }
+}
