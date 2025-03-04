@@ -1,21 +1,25 @@
 const readline = require("readline");
-const {exit} = require("process");
-const {prependListener} = require("process");
+const { start } = require("repl");
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
+  prompt: "$ ",
 });
 
-//Uncomment this block to pass the first stage
-function prompt() {
-  rl.question("$ ", (answer) => {
-   
-    if(answer === "exit 0"){
-      exit(0);
-    }else{
-      console.log(`${answer}: command not found`);
+function startREPL() {
+  rl.prompt();
+  rl.on("line", (command) => {
+    const words = command.split(" ");
+    const firstWord = words[0];
+    if (command == "exit 0") {
+      rl.close();
+    } else if (firstWord == "echo") {
+      console.log(words.slice(1).join(" "));
+      rl.prompt();
+    } else {
+      console.log(`${command}: command not found`);
+      rl.prompt();
     }
-    prompt(); // Recursively call the function to keep the loop going
   });
 }
-prompt();
+startREPL();
