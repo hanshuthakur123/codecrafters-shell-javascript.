@@ -1,79 +1,74 @@
-const readline = require("readline");
-const fs = require("fs");
-const path = require("path");
-
+const readline = require("readline/promises");
+const path = require('path')
+const fs = require('fs')
+const { execFileSync } = require('node:child_process');
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
-  prompt: "$ "
 });
-
-const BUILTINS = ["type", "echo", "exit"];
-
-rl.prompt();
-
-rl.on("line", (input) => {
-  input = input.trim();
-  executeCommand(input);
-  rl.prompt();
-});
-
-function executeCommand(command) {
-  const { cmd, args } = parseCommand(command);
-  
-  switch (cmd) {
-    case "exit":
-      process.exit(0);
-      break;
-    case "echo":
-      echoCommand(args);
-      break;
-    case "type":
-      typeCommand(args[0]);
-      break;
-    default:
-      console.log(`${cmd}: command not found`);
-  }
+function handleInvalid(answer) {
+  rl.write(`${answer}: command not found\n`);
 }
-
-function parseCommand(input) {
-  const args = input.split(/\s+/);
-  const cmd = args.shift();
-  return { cmd, args };
+function handleExit() {
+  rl.close();
 }
-
-function echoCommand(args) {
-  if (args.length === 0) {
-    console.log("No message provided");
+function handleEcho(answer) {
+  rl.write(`${answer.split(" ").slice(1).join(" ")}\n`);
+}
+function handleType(answer) {
+  const command = answer.split(' ')[1]
+  const commands = ['exit', 'echo', 'type'] 
+  if(commands.includes(command.toLowerCase())) {
+    rl.write(`${command} is a shell builtin\n`)
   } else {
-    console.log(args.join(" "));
+    const paths = process.env.PATH.split(":")
+    for(const pathEnv of paths) {
+      let destPath = path.join(pathEnv, command);
+      if(fs.existsSync(destPath) && fs.statSync(destPath).isFile()){        
+        rl.write(`${command} is ${destPath}\n`)
+        return
+      }
+    }
+    rl.write(`${command}: not found\n`)
   }
 }
-
-function typeCommand(cmdName) {
-  if (!cmdName) {
-    console.log("No command name provided");
-    return;
-  }
-
-  if (BUILTINS.includes(cmdName)) {
-    console.log(`${cmdName} is a shell builtin`);
-    return;
-  }
-
-  const paths = process.env.PATH.split(path.delimiter);
-  let found = false;
-  
-  for (let dir of paths) {
-    const fullPath = path.join(dir, cmdName);
-    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
-      console.log(`${cmdName} is ${fullPath}`);
-      found = true;
-      break;
+function handleFile(answer) {
+  const fileName = answer.split(' ')[0]
+  const args = answer.split(' ').slice(1)
+  const paths = process.env.PATH.split(":")
+  for(const pathEnv of paths) {
+    let destPath = path.join(pathEnv, fileName);
+    if(fs.existsSync(destPath) && fs.statSync(destPath).isFile()){        
+      const baseName = path.basename(destPath);
+      const output = execFileSync(destPath, args, { encoding: 'utf-8', stdio: 'pipe' });
+      rl.write(output.replace(destPath, baseName));
+      return;
     }
   }
-
-  if (!found) {
-    console.log(`${cmdName}: not found`);
+  rl.write(`${fileName}: command not found\n`);
+}
+async function question() {
+  const answer = await rl.question("$ ");
+  if (answer.startsWith("invalid")) {
+    handleInvalid(answer);
+    question();
+  } else {
+    switch (answer.split(" ")[0].toLowerCase()) {
+      case "exit":
+        handleExit();
+        break;
+      case "echo":
+        handleEcho(answer);
+        question();
+        break;
+      case "type":
+          handleType(answer);
+          question();
+          break;
+      default:
+        handleFile(answer);
+        question()
+    }
   }
 }
+question();
