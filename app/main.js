@@ -1,101 +1,136 @@
 const readline = require("readline");
 const fs = require("fs");
-const path = require("path");
-const { exit } = require("process");
-const { execFileSync } = require("node:child_process");
+const childProcess = require("child_process");
+const os = require("os");
+const { join } = require("path");
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
-const typeBuiltIn = ["echo", "exit", "type", "pwd", "cd"];
-const currDirParts = __dirname.split("/");
-let currWorkDir = `/${currDirParts[currDirParts.length - 1]}`;
-function prompt() {
-  rl.question("$ ", (answer) => {
-    const parts = answer.split(" ");
-    if (answer === "exit 0") {
-      exit(0);
-    } else if (parts[0] === "echo") {
-      console.log(parts.slice(1).join(" "));
-    } else if (parts[0] === "type") {
-      if (typeBuiltIn.includes(parts[1])) {
-        console.log(`${parts[1]} is a shell builtin`);
-      } else {
-        typePathCommands(parts.slice(1).join(" "));
-      }
-    } else if (parts[0] === "pwd") {
-      console.log(currWorkDir);
-    } else if (parts[0] === "cd") {
-      absolutePath(answer);
-    } else {
-      execCommands(answer);
-    }
-    prompt(); // Recursive prompt call
+function externalPath(command) {
+  return process.env.PATH.split(":").find((path) => {
+    return fs.existsSync(join(path, command));
   });
 }
-function typePathCommands(command) {
-  let found = false;
-  const paths = process.env.PATH.split(path.delimiter);
-  for (let p of paths) {
-    const fullpath = path.join(p, command);
-    if (fs.existsSync(fullpath) && fs.statSync(fullpath).isFile()) {
-      console.log(`${command} is ${fullpath}`);
-      found = true;
-      break; // Exit the loop as we've found the command
-    }
-  }
-  if (!found) {
-    console.log(`${command}: not found`);
-  }
-}
-function execCommands(answer) {
-  let found = false;
-  const paths = process.env.PATH.split(path.delimiter);
-  const fileName = answer.split(" ")[0];
-  const args = answer.split(" ").slice(1);
-  for (let p of paths) {
-    const fullpath = path.join(p, fileName);
-    if (fs.existsSync(fullpath) && fs.statSync(fullpath).isFile()) {
-      // Execute command with the given arguments
-      execFileSync(fullpath, args, {
-        encoding: "utf-8",
-        stdio: "inherit",
-        argv0: fileName,
-      });
-      found = true;
-      break; // Exit the loop as we've executed the command
-    }
-  }
-  if (!found) {
-    console.log(`${answer}: command not found`);
-  }
-}
-function absolutePath(answer) {
-  let pathArg = answer.split(" ")[1];
-  let newWorkDir = currWorkDir;
-  // Check for ~ and replace it with the HOME environment variable
-  if (pathArg.startsWith("~")) {
-    pathArg = pathArg.replace("~", process.env.HOME || "/home/user"); // Replace ~ with HOME env variable
-  }
-  if (pathArg.startsWith("/")) {
-    newWorkDir = pathArg; // Absolute path, start from root
-  } else {
-    // If it's a relative path, we need to build it
-    const steps = pathArg.split("/");
-    for (const step of steps) {
-      if (step === "." || step === "") continue;
-      else if (step === "..") {
-        newWorkDir = newWorkDir.split("/").slice(0, -1).join("/"); // Move up one directory
+function parseArgs(input) {
+  let chunks = [];
+  let singleQuoteOpen = false;
+  let doubleQuoteOpen = false;
+  let backslashOpen = false;
+  let incompleteArg = "";
+  let outputDestination;
+  input
+    .trim()
+    .split("")
+    .forEach((char) => {
+      let backslashJustOpened = false;
+      if (char === "'" && !doubleQuoteOpen && !backslashOpen) {
+        singleQuoteOpen = !singleQuoteOpen;
+      } else if (char === '"' && !singleQuoteOpen && !backslashOpen) {
+        doubleQuoteOpen = !doubleQuoteOpen;
+      } else if (
+        char === "\\" &&
+        !singleQuoteOpen &&
+        !backslashOpen &&
+        chunks.length > 0
+      ) {
+        backslashOpen = true;
+        backslashJustOpened = true;
+      } else if (
+        backslashOpen &&
+        !backslashJustOpened &&
+        ["\\", "$", '"', "\n"].includes(char)
+      ) {
+        incompleteArg = incompleteArg.concat(char);
+      } else if (
+        char === " " &&
+        !singleQuoteOpen &&
+        !doubleQuoteOpen &&
+        !backslashOpen &&
+        incompleteArg.trim() !== ""
+      ) {
+        chunks.push(incompleteArg.trim());
+        incompleteArg = "";
       } else {
-        newWorkDir = path.join(newWorkDir, step);
+        incompleteArg = incompleteArg.concat(char);
       }
-    }
+      if (backslashOpen && !backslashJustOpened) {
+        backslashOpen = false;
+      }
+    });
+  chunks.push(incompleteArg.trim());
+  if (chunks[chunks.length - 2] === ">" || chunks[chunks.length - 2] === "1>") {
+    outputDestination = chunks[chunks.length - 1];
+    chunks = chunks.slice(0, -2);
   }
-  // Check if the directory exists
-  if (!fs.existsSync(newWorkDir)) {
-    console.log(`cd: ${pathArg}: No such file or directory`);
-    return;
-  }
-  currWorkDir = newWorkDir; // Update the current working directory
+  const [command, ...args] = chunks;
+  return { command, args, outputDestination };
 }
-prompt(); // Start the prompt initially
+function log(outputDestination, content) {
+  if (outputDestination) {
+    fs.writeFileSync(outputDestination, content);
+  } else {
+    console.log(content);
+  }
+}
+function prompt() {
+  rl.question("$ ", (answer) => {
+    const { command, args, outputDestination } = parseArgs(answer);
+    const builtinCmds = [];
+    const isBuiltin = (command, candidate) => {
+      builtinCmds.push(candidate);
+      return command === candidate;
+    };
+    if (isBuiltin(command, "exit")) {
+      process.exit(args[0]);
+    }
+    if (isBuiltin(command, "cd")) {
+      const path = args[0].replace("~", os.homedir());
+      try {
+        process.chdir(path);
+      } catch (err) {
+        log(outputDestination, `cd: ${path}: No such file or directory`);
+      }
+      prompt();
+      return;
+    }
+    if (isBuiltin(command, "pwd")) {
+      log(outputDestination, process.cwd());
+      prompt();
+      return;
+    }
+    if (isBuiltin(command, "echo")) {
+      log(outputDestination, args.join(" "));
+      prompt();
+      return;
+    }
+    if (isBuiltin(command, "type")) {
+      if (builtinCmds.includes(args[0])) {
+        log(outputDestination, `${args[0]} is a shell builtin`);
+      } else {
+        const path = externalPath(args[0]);
+        if (path) {
+          log(outputDestination, `${args[0]} is ${path}/${args[0]}`);
+        } else {
+          log(outputDestination, `${args[0]}: not found`);
+        }
+      }
+      prompt();
+      return;
+    }
+    if (externalPath(command)) {
+      let output;
+      try {
+        output = childProcess.execSync(answer).toString().trim();
+      } catch (e) {}
+      if (!outputDestination && output) {
+        log(outputDestination, output);
+      }
+      prompt();
+      return;
+    }
+    log(outputDestination, `${answer}: command not found`);
+    prompt();
+  });
+}
+prompt();
