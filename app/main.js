@@ -68,40 +68,47 @@ function parseArguments(input) {
 }
 function parseCommand(input) {
   const trimmed = input.trim();
-  const stdoutRedirectIndex = trimmed.indexOf("1>");
+  const stdoutAppendIndex = trimmed.indexOf("1>>");
   const stderrRedirectIndex = trimmed.indexOf("2>");
+  const stdoutRedirectIndex = trimmed.indexOf("1>");
+  const simpleAppendIndex = trimmed.indexOf(">>");
   const simpleRedirectIndex = trimmed.indexOf(">");
-  let commandPart, stdoutFile, stderrFile;
-  // Check for 2> first (stderr)
-  if (stderrRedirectIndex !== -1) {
+  let commandPart, stdoutFile, stderrFile, appendStdout = false;
+  if (stdoutAppendIndex !== -1) {
+    commandPart = trimmed.slice(0, stdoutAppendIndex).trim();
+    stdoutFile = trimmed.slice(stdoutAppendIndex + 3).trim();
+    appendStdout = true;
+  } else if (stderrRedirectIndex !== -1) {
     commandPart = trimmed.slice(0, stderrRedirectIndex).trim();
     stderrFile = trimmed.slice(stderrRedirectIndex + 2).trim();
-  } 
-  // Then check for 1> or >
-  else if (stdoutRedirectIndex !== -1) {
+  } else if (stdoutRedirectIndex !== -1) {
     commandPart = trimmed.slice(0, stdoutRedirectIndex).trim();
     stdoutFile = trimmed.slice(stdoutRedirectIndex + 2).trim();
+  } else if (simpleAppendIndex !== -1) {
+    commandPart = trimmed.slice(0, simpleAppendIndex).trim();
+    stdoutFile = trimmed.slice(simpleAppendIndex + 2).trim();
+    appendStdout = true;
   } else if (simpleRedirectIndex !== -1) {
     commandPart = trimmed.slice(0, simpleRedirectIndex).trim();
     stdoutFile = trimmed.slice(simpleRedirectIndex + 1).trim();
   } else {
     commandPart = trimmed;
   }
-  return { command: commandPart, stdoutFile, stderrFile };
+  return { command: commandPart, stdoutFile, stderrFile, appendStdout };
 }
 function promptUser() {
   rl.question("$ ", async (answer) => {
-    const { command, stdoutFile, stderrFile } = parseCommand(answer);
+    const { command, stdoutFile, stderrFile, appendStdout } = parseCommand(answer);
     const args = parseArguments(command);
     if (args[0] === "exit" && args[1] === "0") { // Exit command
       process.exit(0);
     } else if (args[0] === "echo") { // Echo command
       const echoOutput = args.slice(1).join(" ");
       if (stdoutFile) {
-        fsSync.writeFileSync(stdoutFile, echoOutput + "\n");
+        fsSync.writeFileSync(stdoutFile, echoOutput + "\n", { flag: appendStdout ? 'a' : 'w' });
       } else if (stderrFile) {
-        console.log(echoOutput); // Stdout to terminal, no stderr here
-        fsSync.writeFileSync(stderrFile, ""); // Empty stderr file
+        console.log(echoOutput);
+        fsSync.writeFileSync(stderrFile, "");
       } else {
         console.log(echoOutput);
       }
@@ -109,10 +116,10 @@ function promptUser() {
     } else if (args[0] === "pwd") { // Pwd command
       const output = process.cwd();
       if (stdoutFile) {
-        fsSync.writeFileSync(stdoutFile, output + "\n");
+        fsSync.writeFileSync(stdoutFile, output + "\n", { flag: appendStdout ? 'a' : 'w' });
       } else if (stderrFile) {
-        console.log(output); // Stdout to terminal
-        fsSync.writeFileSync(stderrFile, ""); // Empty stderr file
+        console.log(output);
+        fsSync.writeFileSync(stderrFile, "");
       } else {
         console.log(output);
       }
@@ -149,7 +156,7 @@ function promptUser() {
         }
       }
       if (stdoutFile) {
-        fsSync.writeFileSync(stdoutFile, (output || "") + "\n");
+        fsSync.writeFileSync(stdoutFile, (output || "") + "\n", { flag: appendStdout ? 'a' : 'w' });
       } else if (stderrFile) {
         if (output) console.log(output);
         fsSync.writeFileSync(stderrFile, (errorMsg || "") + "\n");
@@ -166,7 +173,7 @@ function promptUser() {
         try {
           const fullPath = await findExecutable(commandName);
           if (stdoutFile) {
-            await runExecutableWithRedirect(fullPath, commandName, commandArgs, stdoutFile, "stdout");
+            await runExecutableWithRedirect(fullPath, commandName, commandArgs, stdoutFile, "stdout", appendStdout);
           } else if (stderrFile) {
             await runExecutableWithRedirect(fullPath, commandName, commandArgs, stderrFile, "stderr");
           } else {
@@ -236,24 +243,24 @@ function runExecutable(fullPath, commandName, args) {
     proc.on("error", (err) => reject(err));
   });
 }
-function runExecutableWithRedirect(fullPath, commandName, args, filePath, redirectType = "stdout") {
+function runExecutableWithRedirect(fullPath, commandName, args, filePath, redirectType = "stdout", append = false) {
   return new Promise((resolve, reject) => {
-    const fileStream = fsSync.createWriteStream(filePath);
+    const fileStream = fsSync.createWriteStream(filePath, { flags: append ? 'a' : 'w' });
     const proc = spawn(fullPath, args, { argv0: commandName });
     if (redirectType === "stdout") {
       proc.stdout.pipe(fileStream);
       proc.stderr.on("data", (data) => {
-        process.stderr.write(data); // Stderr to terminal
+        process.stderr.write(data);
       });
     } else if (redirectType === "stderr") {
       proc.stderr.pipe(fileStream);
       proc.stdout.on("data", (data) => {
-        process.stdout.write(data); // Stdout to terminal
+        process.stdout.write(data);
       });
     }
     proc.on("close", (code) => {
       fileStream.end();
-      resolve(); // Resolve regardless of exit code
+      resolve();
     });
     proc.on("error", (err) => reject(err));
   });
