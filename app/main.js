@@ -8,7 +8,27 @@ const rl = readline.createInterface({
   output: process.stdout,
   completer: (line) => {
     const builtins = ["echo ", "exit "];
-    const hits = builtins.filter((c) => c.startsWith(line));
+    const pathDirs = (process.env.PATH || "").split(":");
+    let externalCommands = [];
+    // Collect executable files from PATH
+    for (const dir of pathDirs) {
+      try {
+        const files = fsSync.readdirSync(dir);
+        files.forEach((file) => {
+          const fullPath = path.join(dir, file);
+          try {
+            fsSync.accessSync(fullPath, fsSync.constants.X_OK);
+            externalCommands.push(file + " ");
+          } catch (err) {
+            // Not executable, skip
+          }
+        });
+      } catch (err) {
+        // Directory not accessible, skip
+      }
+    }
+    const allCommands = [...new Set([...builtins, ...externalCommands])]; // Unique commands
+    const hits = allCommands.filter((c) => c.startsWith(line));
     return [hits, line];
   },
   prompt: "$ ",
@@ -19,7 +39,27 @@ process.stdin.on('data', (data) => {
   if (input === '\t') { // TAB key
     const line = rl.line || ""; // Current input buffer
     const builtins = ["echo ", "exit "];
-    const hits = builtins.filter((c) => c.startsWith(line));
+    const pathDirs = (process.env.PATH || "").split(":");
+    let externalCommands = [];
+    // Collect executable files from PATH
+    for (const dir of pathDirs) {
+      try {
+        const files = fsSync.readdirSync(dir);
+        files.forEach((file) => {
+          const fullPath = path.join(dir, file);
+          try {
+            fsSync.accessSync(fullPath, fsSync.constants.X_OK);
+            externalCommands.push(file + " ");
+          } catch (err) {
+            // Not executable, skip
+          }
+        });
+      } catch (err) {
+        // Directory not accessible, skip
+      }
+    }
+    const allCommands = [...new Set([...builtins, ...externalCommands])]; // Unique commands
+    const hits = allCommands.filter((c) => c.startsWith(line));
     if (hits.length > 0) {
       rl.write(null, { ctrl: true, name: 'u' }); // Clear line
       rl.write(hits[0]); // Complete with first match
@@ -217,7 +257,7 @@ async function processCommand(answer) {
   }
 }
 async function checkPath(command) {
-  const pathDirs = process.env.PATH.split(":");
+  const pathDirs = (process.env.PATH || "").split(":");
   for (const dir of pathDirs) {
     const fullPath = path.join(dir, command);
     try {
@@ -230,7 +270,7 @@ async function checkPath(command) {
   throw new Error("Executable not found");
 }
 async function findExecutable(command) {
-  const pathDirs = process.env.PATH.split(":");
+  const pathDirs = (process.env.PATH || "").split(":");
   for (const dir of pathDirs) {
     const fullPath = path.join(dir, command);
     try {
@@ -290,6 +330,5 @@ rl.on("line", async (line) => {
   rl.prompt();
 }).on("close", () => {
   process.exit(0);
-
 });
 rl.prompt();
