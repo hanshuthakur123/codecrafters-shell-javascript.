@@ -6,6 +6,12 @@ const { spawn } = require("child_process");
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
+  completer: (line) => {
+    const builtins = ["echo ", "exit "]; // Space added for completion
+    const hits = builtins.filter((c) => c.startsWith(line));
+    return [hits.length ? hits : builtins, line];
+  },
+  prompt: "$ ",
 });
 function parseArguments(input) {
   const args = [];
@@ -101,109 +107,99 @@ function parseCommand(input) {
   }
   return { command: commandPart, stdoutFile, stderrFile, appendStdout, appendStderr };
 }
-function promptUser() {
-  rl.question("$ ", async (answer) => {
-    const { command, stdoutFile, stderrFile, appendStdout, appendStderr } = parseCommand(answer);
-    const args = parseArguments(command);
-    if (args[0] === "exit" && args[1] === "0") { // Exit command
-      process.exit(0);
-    } else if (args[0] === "echo") { // Echo command
-      const echoOutput = args.slice(1).join(" ");
-      if (stdoutFile) {
-        fsSync.writeFileSync(stdoutFile, echoOutput + "\n", { flag: appendStdout ? 'a' : 'w' });
-      } else if (stderrFile) {
-        console.log(echoOutput);
-        fsSync.writeFileSync(stderrFile, "", { flag: appendStderr ? 'a' : 'w' });
-      } else {
-        console.log(echoOutput);
-      }
-      promptUser();
-    } else if (args[0] === "pwd") { // Pwd command
-      const output = process.cwd();
-      if (stdoutFile) {
-        fsSync.writeFileSync(stdoutFile, output + "\n", { flag: appendStdout ? 'a' : 'w' });
-      } else if (stderrFile) {
-        console.log(output);
-        fsSync.writeFileSync(stderrFile, "", { flag: appendStderr ? 'a' : 'w' });
-      } else {
-        console.log(output);
-      }
-      promptUser();
-    } else if (args[0] === "cd" && args[1]) { // Cd command
-      let targetPath = args[1];
-      if (targetPath === "~") {
-        targetPath = process.env.HOME || "/";
-      }
-      try {
-        const absolutePath = path.resolve(targetPath);
-        process.chdir(absolutePath);
-      } catch (err) {
-        const errorMsg = `cd: ${args[1]}: No such file or directory`;
-        if (stderrFile) {
-          fsSync.writeFileSync(stderrFile, errorMsg + "\n", { flag: appendStderr ? 'a' : 'w' });
-        } else {
-          console.log(errorMsg);
-        }
-      }
-      promptUser();
-    } else if (args[0] === "type" && args[1]) { // Type command
-      const arg = args[1];
-      const builtins = ["echo", "exit", "type", "pwd", "cd"];
-      let output, errorMsg;
-      if (builtins.includes(arg)) {
-        output = `${arg} is a shell builtin`;
-      } else {
-        try {
-          const result = await checkPath(arg);
-          output = result;
-        } catch (err) {
-          errorMsg = `${arg}: not found`;
-        }
-      }
-      if (stdoutFile) {
-        fsSync.writeFileSync(stdoutFile, (output || "") + "\n", { flag: appendStdout ? 'a' : 'w' });
-      } else if (stderrFile) {
-        if (output) console.log(output);
-        fsSync.writeFileSync(stderrFile, (errorMsg || "") + "\n", { flag: appendStderr ? 'a' : 'w' });
-      } else {
-        if (output) console.log(output);
-        else if (errorMsg) console.log(errorMsg);
-      }
-      promptUser();
-    } else if (args.length > 0) { // External command or invalid
-      const commandName = args[0];
-      const commandArgs = args.slice(1);
-      const builtins = ["echo", "exit", "type", "pwd", "cd"];
-      if (!builtins.includes(commandName)) {
-        try {
-          const fullPath = await findExecutable(commandName);
-          if (stdoutFile) {
-            await runExecutableWithRedirect(fullPath, commandName, commandArgs, stdoutFile, "stdout", appendStdout);
-          } else if (stderrFile) {
-            await runExecutableWithRedirect(fullPath, commandName, commandArgs, stderrFile, "stderr", appendStderr);
-          } else {
-            const output = await runExecutable(fullPath, commandName, commandArgs);
-            console.log(output.trim());
-          }
-        } catch (err) {
-          if (err.message === "Executable not found") {
-            const errorMsg = `${commandName}: command not found`;
-            if (stderrFile) {
-              fsSync.writeFileSync(stderrFile, errorMsg + "\n", { flag: appendStderr ? 'a' : 'w' });
-            } else {
-              console.log(errorMsg);
-            }
-          }
-        }
-        promptUser();
-      } else {
-        console.log(`${commandName}: command not found`);
-        promptUser();
-      }
-    } else { // Empty input
-      promptUser();
+async function processCommand(answer) {
+  const { command, stdoutFile, stderrFile, appendStdout, appendStderr } = parseCommand(answer);
+  const args = parseArguments(command);
+  if (args[0] === "exit" && args[1] === "0") { // Exit command
+    process.exit(0);
+  } else if (args[0] === "echo") { // Echo command
+    const echoOutput = args.slice(1).join(" ");
+    if (stdoutFile) {
+      fsSync.writeFileSync(stdoutFile, echoOutput + "\n", { flag: appendStdout ? 'a' : 'w' });
+    } else if (stderrFile) {
+      console.log(echoOutput);
+      fsSync.writeFileSync(stderrFile, "", { flag: appendStderr ? 'a' : 'w' });
+    } else {
+      console.log(echoOutput);
     }
-  });
+  } else if (args[0] === "pwd") { // Pwd command
+    const output = process.cwd();
+    if (stdoutFile) {
+      fsSync.writeFileSync(stdoutFile, output + "\n", { flag: appendStdout ? 'a' : 'w' });
+    } else if (stderrFile) {
+      console.log(output);
+      fsSync.writeFileSync(stderrFile, "", { flag: appendStderr ? 'a' : 'w' });
+    } else {
+      console.log(output);
+    }
+  } else if (args[0] === "cd" && args[1]) { // Cd command
+    let targetPath = args[1];
+    if (targetPath === "~") {
+      targetPath = process.env.HOME || "/";
+    }
+    try {
+      const absolutePath = path.resolve(targetPath);
+      process.chdir(absolutePath);
+    } catch (err) {
+      const errorMsg = `cd: ${args[1]}: No such file or directory`;
+      if (stderrFile) {
+        fsSync.writeFileSync(stderrFile, errorMsg + "\n", { flag: appendStderr ? 'a' : 'w' });
+      } else {
+        console.log(errorMsg);
+      }
+    }
+  } else if (args[0] === "type" && args[1]) { // Type command
+    const arg = args[1];
+    const builtins = ["echo", "exit", "type", "pwd", "cd"];
+    let output, errorMsg;
+    if (builtins.includes(arg)) {
+      output = `${arg} is a shell builtin`;
+    } else {
+      try {
+        const result = await checkPath(arg);
+        output = result;
+      } catch (err) {
+        errorMsg = `${arg}: not found`;
+      }
+    }
+    if (stdoutFile) {
+      fsSync.writeFileSync(stdoutFile, (output || "") + "\n", { flag: appendStdout ? 'a' : 'w' });
+    } else if (stderrFile) {
+      if (output) console.log(output);
+      fsSync.writeFileSync(stderrFile, (errorMsg || "") + "\n", { flag: appendStderr ? 'a' : 'w' });
+    } else {
+      if (output) console.log(output);
+      else if (errorMsg) console.log(errorMsg);
+    }
+  } else if (args.length > 0) { // External command or invalid
+    const commandName = args[0];
+    const commandArgs = args.slice(1);
+    const builtins = ["echo", "exit", "type", "pwd", "cd"];
+    if (!builtins.includes(commandName)) {
+      try {
+        const fullPath = await findExecutable(commandName);
+        if (stdoutFile) {
+          await runExecutableWithRedirect(fullPath, commandName, commandArgs, stdoutFile, "stdout", appendStdout);
+        } else if (stderrFile) {
+          await runExecutableWithRedirect(fullPath, commandName, commandArgs, stderrFile, "stderr", appendStderr);
+        } else {
+          const output = await runExecutable(fullPath, commandName, commandArgs);
+          console.log(output.trim());
+        }
+      } catch (err) {
+        if (err.message === "Executable not found") {
+          const errorMsg = `${commandName}: command not found`;
+          if (stderrFile) {
+            fsSync.writeFileSync(stderrFile, errorMsg + "\n", { flag: appendStderr ? 'a' : 'w' });
+          } else {
+            console.log(errorMsg);
+          }
+        }
+      }
+    } else {
+      console.log(`${commandName}: command not found`);
+    }
+  }
 }
 async function checkPath(command) {
   const pathDirs = process.env.PATH.split(":");
@@ -270,4 +266,14 @@ function runExecutableWithRedirect(fullPath, commandName, args, filePath, redire
     proc.on("error", (err) => reject(err));
   });
 }
-promptUser();
+
+// Start the shell
+rl.prompt();
+rl.on("line", async (line) => {
+  if (line.trim()) {
+    await processCommand(line);
+  }
+  rl.prompt();
+}).on("close", () => {
+  process.exit(0);
+});
