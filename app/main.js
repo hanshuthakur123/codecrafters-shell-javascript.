@@ -7,11 +7,26 @@ const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
   completer: (line) => {
-    const builtins = ["echo ", "exit "]; // Space added for completion
+    const builtins = ["echo ", "exit "];
     const hits = builtins.filter((c) => c.startsWith(line));
-    return [hits.length ? hits : builtins, line];
+    return [hits, line];
   },
   prompt: "$ ",
+});
+// Custom TAB handling
+process.stdin.on('data', (data) => {
+  const input = data.toString();
+  if (input === '\t') { // TAB key
+    const line = rl.line || ""; // Current input buffer
+    const builtins = ["echo ", "exit "];
+    const hits = builtins.filter((c) => c.startsWith(line));
+    if (hits.length > 0) {
+      rl.write(null, { ctrl: true, name: 'u' }); // Clear line
+      rl.write(hits[0]); // Complete with first match
+    } else {
+      process.stdout.write('\x07'); // Bell for no matches
+    }
+  }
 });
 function parseArguments(input) {
   const args = [];
@@ -266,14 +281,15 @@ function runExecutableWithRedirect(fullPath, commandName, args, filePath, redire
     proc.on("error", (err) => reject(err));
   });
 }
-
 // Start the shell
-rl.prompt();
 rl.on("line", async (line) => {
-  if (line.trim()) {
-    await processCommand(line);
+  const trimmedLine = line.trim();
+  if (trimmedLine) {
+    await processCommand(trimmedLine);
   }
   rl.prompt();
 }).on("close", () => {
   process.exit(0);
+
 });
+rl.prompt();
