@@ -69,12 +69,17 @@ function parseArguments(input) {
 function parseCommand(input) {
   const trimmed = input.trim();
   const stdoutAppendIndex = trimmed.indexOf("1>>");
+  const stderrAppendIndex = trimmed.indexOf("2>>");
   const stderrRedirectIndex = trimmed.indexOf("2>");
   const stdoutRedirectIndex = trimmed.indexOf("1>");
   const simpleAppendIndex = trimmed.indexOf(">>");
   const simpleRedirectIndex = trimmed.indexOf(">");
-  let commandPart, stdoutFile, stderrFile, appendStdout = false;
-  if (stdoutAppendIndex !== -1) {
+  let commandPart, stdoutFile, stderrFile, appendStdout = false, appendStderr = false;
+  if (stderrAppendIndex !== -1) {
+    commandPart = trimmed.slice(0, stderrAppendIndex).trim();
+    stderrFile = trimmed.slice(stderrAppendIndex + 3).trim();
+    appendStderr = true;
+  } else if (stdoutAppendIndex !== -1) {
     commandPart = trimmed.slice(0, stdoutAppendIndex).trim();
     stdoutFile = trimmed.slice(stdoutAppendIndex + 3).trim();
     appendStdout = true;
@@ -94,11 +99,11 @@ function parseCommand(input) {
   } else {
     commandPart = trimmed;
   }
-  return { command: commandPart, stdoutFile, stderrFile, appendStdout };
+  return { command: commandPart, stdoutFile, stderrFile, appendStdout, appendStderr };
 }
 function promptUser() {
   rl.question("$ ", async (answer) => {
-    const { command, stdoutFile, stderrFile, appendStdout } = parseCommand(answer);
+    const { command, stdoutFile, stderrFile, appendStdout, appendStderr } = parseCommand(answer);
     const args = parseArguments(command);
     if (args[0] === "exit" && args[1] === "0") { // Exit command
       process.exit(0);
@@ -108,7 +113,7 @@ function promptUser() {
         fsSync.writeFileSync(stdoutFile, echoOutput + "\n", { flag: appendStdout ? 'a' : 'w' });
       } else if (stderrFile) {
         console.log(echoOutput);
-        fsSync.writeFileSync(stderrFile, "");
+        fsSync.writeFileSync(stderrFile, "", { flag: appendStderr ? 'a' : 'w' });
       } else {
         console.log(echoOutput);
       }
@@ -119,7 +124,7 @@ function promptUser() {
         fsSync.writeFileSync(stdoutFile, output + "\n", { flag: appendStdout ? 'a' : 'w' });
       } else if (stderrFile) {
         console.log(output);
-        fsSync.writeFileSync(stderrFile, "");
+        fsSync.writeFileSync(stderrFile, "", { flag: appendStderr ? 'a' : 'w' });
       } else {
         console.log(output);
       }
@@ -135,7 +140,7 @@ function promptUser() {
       } catch (err) {
         const errorMsg = `cd: ${args[1]}: No such file or directory`;
         if (stderrFile) {
-          fsSync.writeFileSync(stderrFile, errorMsg + "\n");
+          fsSync.writeFileSync(stderrFile, errorMsg + "\n", { flag: appendStderr ? 'a' : 'w' });
         } else {
           console.log(errorMsg);
         }
@@ -159,7 +164,7 @@ function promptUser() {
         fsSync.writeFileSync(stdoutFile, (output || "") + "\n", { flag: appendStdout ? 'a' : 'w' });
       } else if (stderrFile) {
         if (output) console.log(output);
-        fsSync.writeFileSync(stderrFile, (errorMsg || "") + "\n");
+        fsSync.writeFileSync(stderrFile, (errorMsg || "") + "\n", { flag: appendStderr ? 'a' : 'w' });
       } else {
         if (output) console.log(output);
         else if (errorMsg) console.log(errorMsg);
@@ -175,7 +180,7 @@ function promptUser() {
           if (stdoutFile) {
             await runExecutableWithRedirect(fullPath, commandName, commandArgs, stdoutFile, "stdout", appendStdout);
           } else if (stderrFile) {
-            await runExecutableWithRedirect(fullPath, commandName, commandArgs, stderrFile, "stderr");
+            await runExecutableWithRedirect(fullPath, commandName, commandArgs, stderrFile, "stderr", appendStderr);
           } else {
             const output = await runExecutable(fullPath, commandName, commandArgs);
             console.log(output.trim());
@@ -184,7 +189,7 @@ function promptUser() {
           if (err.message === "Executable not found") {
             const errorMsg = `${commandName}: command not found`;
             if (stderrFile) {
-              fsSync.writeFileSync(stderrFile, errorMsg + "\n");
+              fsSync.writeFileSync(stderrFile, errorMsg + "\n", { flag: appendStderr ? 'a' : 'w' });
             } else {
               console.log(errorMsg);
             }
