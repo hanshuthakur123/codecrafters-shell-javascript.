@@ -1,154 +1,101 @@
 const readline = require("readline");
 const fs = require("fs");
 const path = require("path");
-const { spawn } = require("child_process");
-
-// Create a readline interface for input/output
+const { exit } = require("process");
+const { execFileSync } = require("node:child_process");
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
-  prompt: "$ ",
 });
-
-// List of built-in commands
-const BUILTIN_CMDS = ["type", "echo", "exit", "pwd", "cd"];
-
-// Start the shell prompt
-rl.prompt();
-
-// Handle user input
-rl.on("line", (input) => {
-  input = input.trim(); // Remove leading/trailing whitespace
-  execCmd(input, () => rl.prompt()); // Execute the command and re-prompt
-});
-
-// Execute the command
-function execCmd(command, callback) {
-  const { cmd, args } = parseCommand(command); // Parse the command and arguments
-
-  if (BUILTIN_CMDS.includes(cmd)) {
-    handleBuiltinCmd(cmd, args, callback); // Handle built-in commands
-  } else {
-    handleExternalCmd(cmd, args, callback); // Handle external commands
-  }
-}
-
-// Parse the command into cmd and args
-function parseCommand(input) {
-  const parts = input.split(/\s+/); // Split input by whitespace
-  const cmd = parts[0]; // First part is the command
-  const args = parts.slice(1); // Remaining parts are arguments
-  return { cmd, args };
-}
-
-// Handle built-in commands
-function handleBuiltinCmd(cmd, args, callback) {
-  switch (cmd) {
-    case "exit":
-      process.exit(args[0] ? parseInt(args[0]) : 0); // Exit with optional status code
-      break;
-    case "echo":
-      console.log(args.join(" ")); // Echo the arguments
-      callback();
-      break;
-    case "type":
-      printType(args[0]); // Print the type of the command
-      callback();
-      break;
-    case "pwd":
-      console.log(process.cwd()); // Print the current working directory
-      callback();
-      break;
-    case "cd":
-      handleCd(args[0]); // Change the directory
-      callback();
-      break;
-    default:
-      callback();
-  }
-}
-
-// Handle external commands
-function handleExternalCmd(cmd, args, callback) {
-  const paths = process.env.PATH.split(path.delimiter); // Get paths from PATH environment variable
-  let found = false;
-
-  // Search for the command in each path
-  for (const p of paths) {
-    const fullPath = path.join(p, cmd); // Construct the full path to the command
-    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
-      found = true;
-
-      // Spawn a child process to execute the command
-      const child = spawn(fullPath, args);
-
-      // Capture the output of the child process
-      let output = "";
-      child.stdout.on("data", (data) => {
-        output += data.toString(); // Collect output
-      });
-
-      // When the process exits, modify the output and print it
-      child.on("close", (code) => {
-        // Replace the full path with just the program name
-        const modifiedOutput = output.replace(
-          new RegExp(fullPath, "g"),
-          cmd
-        );
-        console.log(modifiedOutput.trim()); // Print the modified output
-        callback();
-      });
-
-      // Handle errors
-      child.on("error", (err) => {
-        console.error(err);
-        callback();
-      });
-
-      break;
-    }
-  }
-
-  // If the command is not found, print an error message
-  if (!found) {
-    console.log(`${cmd}: command not found`);
-    callback();
-  }
-}
-
-// Handle the cd command
-function handleCd(dir) {
-  if (!dir) {
-    console.log("cd: missing argument"); // Handle missing directory argument
-    return;
-  }
-
-  try {
-    if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
-      process.chdir(dir); // Change the directory
+const typeBuiltIn = ["echo", "exit", "type", "pwd", "cd"];
+const currDirParts = __dirname.split("/");
+let currWorkDir = `/${currDirParts[currDirParts.length - 1]}`;
+function prompt() {
+  rl.question("$ ", (answer) => {
+    const parts = answer.split(" ");
+    if (answer === "exit 0") {
+      exit(0);
+    } else if (parts[0] === "echo") {
+      console.log(parts.slice(1).join(" "));
+    } else if (parts[0] === "type") {
+      if (typeBuiltIn.includes(parts[1])) {
+        console.log(`${parts[1]} is a shell builtin`);
+      } else {
+        typePathCommands(parts.slice(1).join(" "));
+      }
+    } else if (parts[0] === "pwd") {
+      console.log(currWorkDir);
+    } else if (parts[0] === "cd") {
+      absolutePath(answer);
     } else {
-      console.log(`cd: ${dir}: No such file or directory`); // Print error if directory doesn't exist
+      execCommands(answer);
     }
-  } catch (err) {
-    console.log(`cd: ${dir}: No such file or directory`); // Handle any errors
+    prompt(); // Recursive prompt call
+  });
+}
+function typePathCommands(command) {
+  let found = false;
+  const paths = process.env.PATH.split(path.delimiter);
+  for (let p of paths) {
+    const fullpath = path.join(p, command);
+    if (fs.existsSync(fullpath) && fs.statSync(fullpath).isFile()) {
+      console.log(`${command} is ${fullpath}`);
+      found = true;
+      break; // Exit the loop as we've found the command
+    }
+  }
+  if (!found) {
+    console.log(`${command}: not found`);
   }
 }
-
-// Print the type of a command
-function printType(cmdName) {
-  if (BUILTIN_CMDS.includes(cmdName)) {
-    console.log(`${cmdName} is a shell builtin`); // Built-in command
+function execCommands(answer) {
+  let found = false;
+  const paths = process.env.PATH.split(path.delimiter);
+  const fileName = answer.split(" ")[0];
+  const args = answer.split(" ").slice(1);
+  for (let p of paths) {
+    const fullpath = path.join(p, fileName);
+    if (fs.existsSync(fullpath) && fs.statSync(fullpath).isFile()) {
+      // Execute command with the given arguments
+      execFileSync(fullpath, args, {
+        encoding: "utf-8",
+        stdio: "inherit",
+        argv0: fileName,
+      });
+      found = true;
+      break; // Exit the loop as we've executed the command
+    }
+  }
+  if (!found) {
+    console.log(`${answer}: command not found`);
+  }
+}
+function absolutePath(answer) {
+  let pathArg = answer.split(" ")[1];
+  let newWorkDir = currWorkDir;
+  // Check for ~ and replace it with the HOME environment variable
+  if (pathArg.startsWith("~")) {
+    pathArg = pathArg.replace("~", process.env.HOME || "/home/user"); // Replace ~ with HOME env variable
+  }
+  if (pathArg.startsWith("/")) {
+    newWorkDir = pathArg; // Absolute path, start from root
+  } else {
+    // If it's a relative path, we need to build it
+    const steps = pathArg.split("/");
+    for (const step of steps) {
+      if (step === "." || step === "") continue;
+      else if (step === "..") {
+        newWorkDir = newWorkDir.split("/").slice(0, -1).join("/"); // Move up one directory
+      } else {
+        newWorkDir = path.join(newWorkDir, step);
+      }
+    }
+  }
+  // Check if the directory exists
+  if (!fs.existsSync(newWorkDir)) {
+    console.log(`cd: ${pathArg}: No such file or directory`);
     return;
   }
-
-  const paths = process.env.PATH.split(path.delimiter); // Get paths from PATH environment variable
-  for (const p of paths) {
-    const fullPath = path.join(p, cmdName); // Construct the full path to the command
-    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
-      console.log(`${cmdName} is ${fullPath}`); // External command
-      return;
-    }
-  }
-
-  console.log(`${cmdName}: not found`); // Command not found
+  currWorkDir = newWorkDir; // Update the current working directory
 }
+prompt(); // Start the prompt initially
