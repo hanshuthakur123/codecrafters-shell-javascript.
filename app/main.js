@@ -91,9 +91,6 @@ const rl = readline.createInterface({
     // Remove duplicates (in case an executable has the same name as a builtin)
     const uniqueHits = [...new Set(allHits)];
     
-    // Sort the unique hits to ensure consistent order
-    uniqueHits.sort();
-    
     // If there are no matches, ring the bell
     if (uniqueHits.length === 0) {
       // Ring the bell - try multiple methods to ensure it works
