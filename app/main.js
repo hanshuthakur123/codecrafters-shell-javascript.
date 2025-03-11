@@ -1,363 +1,349 @@
-const readline = require('readline');
-const fs = require('fs');
-const path = require('path');
-const { spawnSync } = require('child_process');
+const readline = require("readline");
+const fs = require("fs");
+const path = require("path");
+const { spawnSync } = require("child_process");
 
-class SimpleShell {
-  constructor() {
-    this.lastTabLine = ''; // Stores the last input line for tab completion
-    this.tabPressCount = 0; // Tracks the number of consecutive tab presses
+// Constants
+const BUILTIN_COMMANDS = new Set(["exit", "echo", "cd", "pwd", "type"]);
+const REDIRECTION_OPERATORS = new Set([">", ">>", "1>", "2>", "1>>", "2>>"]);
 
-    // Built-in commands and their handlers
-    this.builtinCommands = {
-      'exit': this.exitCommand.bind(this),
-      'cd': this.cdCommand.bind(this),
-      'pwd': this.pwdCommand.bind(this),
-      'echo': this.echoCommand.bind(this),
-      'type': this.typeCommand.bind(this)
-    };
+// Readline Interface
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+  completer: completer,
+});
 
-    // Readline interface for user input
-    this.rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-      completer: this.tabCompleter.bind(this) // Tab completion handler
-    });
-  }
+// Tab Completion State
+let lastTabLine = "";
+let tabPressCount = 0;
 
-  // Start the shell
-  start() {
-    this.promptUser();
-  }
+// ----- Helper Functions -----
 
-  // Display the prompt and handle user input
-  promptUser() {
-    this.rl.question('$ ', (input) => {
-      if (!input.trim()) {
-        // If input is empty, prompt again
-        this.promptUser();
-        return;
-      }
+/**
+ * Finds executable files in PATH that match a given prefix.
+ */
+function findExecutablesInPath(prefix) {
+  const pathDirs = process.env.PATH.split(path.delimiter);
+  const executables = [];
 
-      // Reset tab completion state
-      this.lastTabLine = '';
-      this.tabPressCount = 0;
-
-      // Execute the command
-      this.executeCommand(input);
-    });
-  }
-
-  // Execute the given command
-  executeCommand(input) {
-    // Parse redirection operators
-    const { command, stdoutFile, stderrFile, appendStdout, appendStderr } = this.parseRedirection(input);
-
-    // Parse arguments with quotes and escape sequences
-    const args = this.parseArguments(command);
-    if (!args.length) {
-      // If no arguments, prompt again
-      this.promptUser();
-      return;
-    }
-
-    const cmd = args[0]; // Command name
-    const cmdArgs = args.slice(1); // Command arguments
-
-    // Check if the command is a built-in command
-    if (this.builtinCommands[cmd]) {
-      this.builtinCommands[cmd](cmdArgs, stdoutFile, stderrFile, appendStdout, appendStderr);
-    } else {
-      // Execute external command
-      this.executeExternalCommand(cmd, cmdArgs, stdoutFile, stderrFile, appendStdout, appendStderr);
-    }
-  }
-
-  // Built-in command: exit
-  exitCommand(args) {
-    const exitCode = args.length ? parseInt(args[0]) || 0 : 0;
-    process.exit(exitCode);
-  }
-
-  // Built-in command: cd
-  cdCommand(args) {
-    const targetDir = args[0] || process.env.HOME; // Default to home directory
+  for (const dir of pathDirs) {
     try {
-      process.chdir(path.resolve(targetDir)); // Change directory
-    } catch (error) {
-      console.error(`cd: ${targetDir}: No such file or directory`);
-    }
-    this.promptUser();
-  }
+      if (!fs.existsSync(dir)) continue;
 
-  // Built-in command: pwd
-  pwdCommand(args, stdoutFile, stderrFile, appendStdout, appendStderr) {
-    const output = process.cwd(); // Get current working directory
-    this.handleOutput(output, stdoutFile, stderrFile, appendStdout, appendStderr);
-    this.promptUser();
-  }
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        if (file.startsWith(prefix)) {
+          const filePath = path.join(dir, file);
+          try {
+            const stats = fs.statSync(filePath);
+            const isExecutable =
+              process.platform === "win32"
+                ? stats.isFile()
+                : stats.isFile() && stats.mode & 0o111;
 
-  // Built-in command: echo
-  echoCommand(args, stdoutFile, stderrFile, appendStdout, appendStderr) {
-    const output = args.join(' '); // Join arguments into a single string
-    this.handleOutput(output, stdoutFile, stderrFile, appendStdout, appendStderr);
-    this.promptUser();
-  }
-
-  // Built-in command: type
-  typeCommand(args) {
-    const cmd = args[0];
-    if (!cmd) {
-      console.log('Usage: type [command]');
-    } else if (this.builtinCommands[cmd]) {
-      console.log(`${cmd} is a shell builtin`);
-    } else {
-      const executablePath = this.findExecutableInPath(cmd);
-      if (executablePath) {
-        console.log(`${cmd} is ${executablePath}`);
-      } else {
-        console.log(`${cmd}: not found`);
-      }
-    }
-    this.promptUser();
-  }
-
-  // Execute an external command
-  executeExternalCommand(command, args, stdoutFile, stderrFile, appendStdout, appendStderr) {
-    const executablePath = this.findExecutableInPath(command);
-    if (!executablePath) {
-      console.log(`${command}: command not found`);
-      this.promptUser();
-      return;
-    }
-
-    try {
-      // Configure stdio based on redirection
-      const stdio = [
-        'inherit', // stdin
-        stdoutFile ? 'pipe' : 'inherit', // stdout
-        stderrFile ? 'pipe' : 'inherit' // stderr
-      ];
-
-      // Execute the command
-      const result = spawnSync(command, args, { stdio });
-
-      if (result.error) {
-        throw result.error;
-      }
-
-      // Handle stdout redirection
-      if (stdoutFile && result.stdout) {
-        this.writeToFile(stdoutFile, result.stdout, appendStdout);
-      }
-
-      // Handle stderr redirection
-      if (stderrFile && result.stderr) {
-        this.writeToFile(stderrFile, result.stderr, appendStderr);
+            if (isExecutable) executables.push(file);
+          } catch (error) {
+            continue; // Skip inaccessible files
+          }
+        }
       }
     } catch (error) {
-      console.error(`Error executing ${command}: ${error.message}`);
+      continue; // Skip inaccessible directories
     }
-
-    this.promptUser();
   }
 
-  // Parse redirection operators
-  parseRedirection(input) {
-    const redirectionPatterns = [
-      { regex: /(.*?)\s+(2>>)\s+(\S+)/, stderrFile: true, append: true }, // stderr append (2>>)
-      { regex: /(.*?)\s+(2>)\s+(\S+)/, stderrFile: true, append: false }, // stderr (2>)
-      { regex: /(.*?)\s+(>>|1>>)\s+(\S+)/, stdoutFile: true, append: true }, // stdout append (>> or 1>>)
-      { regex: /(.*?)\s+(>|1>)\s+(\S+)/, stdoutFile: true, append: false } // stdout (> or 1>)
-    ];
+  return executables;
+}
 
-    for (const pattern of redirectionPatterns) {
-      const match = input.match(pattern.regex);
-      if (match) {
-        return {
-          command: match[1].trim(),
-          stdoutFile: pattern.stdoutFile ? match[3].trim() : null,
-          stderrFile: pattern.stderrFile ? match[3].trim() : null,
-          appendStdout: pattern.stdoutFile && pattern.append,
-          appendStderr: pattern.stderrFile && pattern.append
-        };
-      }
-    }
+/**
+ * Provides tab completion for commands and executables.
+ */
+function completer(line) {
+  const trimmedLine = line.trim();
 
-    // No redirection
-    return { command: input, stdoutFile: null, stderrFile: null, appendStdout: false, appendStderr: false };
+  if (trimmedLine === lastTabLine) {
+    tabPressCount++;
+  } else {
+    tabPressCount = 1;
+    lastTabLine = trimmedLine;
   }
 
-  // Parse command arguments with quotes and escape sequences
-  parseArguments(input) {
-    const args = [];
-    let currentArg = '';
-    let inSingleQuotes = false;
-    let inDoubleQuotes = false;
-
-    for (let i = 0; i < input.length; i++) {
-      const char = input[i];
-
-      // Handle escape sequences
-      if (char === '\\') {
-        if (i + 1 < input.length) {
-          currentArg += input[++i]; // Add the escaped character
-        } else {
-          currentArg += '\\'; // Add the backslash if it's the last character
-        }
-        continue;
-      }
-
-      // Toggle single quotes
-      if (char === "'" && !inDoubleQuotes) {
-        inSingleQuotes = !inSingleQuotes;
-        continue;
-      }
-
-      // Toggle double quotes
-      if (char === '"' && !inSingleQuotes) {
-        inDoubleQuotes = !inDoubleQuotes;
-        continue;
-      }
-
-      // Split arguments on spaces (outside quotes)
-      if (char === ' ' && !inSingleQuotes && !inDoubleQuotes) {
-        if (currentArg) {
-          args.push(currentArg);
-          currentArg = '';
-        }
-        continue;
-      }
-
-      // Add the character to the current argument
-      currentArg += char;
-    }
-
-    // Add the last argument
-    if (currentArg) {
-      args.push(currentArg);
-    }
-
-    return args;
+  if (trimmedLine === "") {
+    return [[...BUILTIN_COMMANDS], line];
   }
 
-  // Find an executable in the PATH
-  findExecutableInPath(command) {
-    const pathDirs = process.env.PATH.split(path.delimiter);
-    for (const dir of pathDirs) {
-      const fullPath = path.join(dir, command);
-      if (fs.existsSync(fullPath)) {
-        const stats = fs.statSync(fullPath);
-        if (stats.isFile() && (process.platform === 'win32' || (stats.mode & 0o111))) {
-          return fullPath;
-        }
-      }
-    }
-    return null;
-  }
+  const builtinHits = [...BUILTIN_COMMANDS].filter((cmd) =>
+    cmd.startsWith(trimmedLine)
+  );
+  const pathExecutables = findExecutablesInPath(trimmedLine);
+  const allHits = [...builtinHits, ...pathExecutables];
+  const uniqueHits = [...new Set(allHits)].sort(); // Sort the matches alphabetically
 
-  // Tab completion handler
-  tabCompleter(line) {
-    const trimmedLine = line.trim();
-
-    if (trimmedLine === this.lastTabLine) {
-      this.tabPressCount++;
-    } else {
-      this.tabPressCount = 1;
-      this.lastTabLine = trimmedLine;
-    }
-
-    // Find all possible completions
-    const builtins = Object.keys(this.builtinCommands);
-    const builtinHits = builtins.filter(builtin => builtin.startsWith(trimmedLine));
-    const pathExecutables = this.findExecutablesInPath(trimmedLine);
-    const allHits = [...builtinHits, ...pathExecutables];
-    const uniqueHits = [...new Set(allHits)];
-
-    if (uniqueHits.length === 0) {
-      // No matches: ring the bell
-      process.stdout.write('\u0007'); // Bell character
-      return [[], line]; // Return the original line unchanged
-    }
-
-    if (uniqueHits.length === 1) {
-      // Single match: complete the command and add a space
-      this.tabPressCount = 0; // Reset counter after completion
-      return [[uniqueHits[0] + ' '], line]; // Add a space after the completed command
-    }
-
-    if (this.tabPressCount >= 2) {
-      // Multiple matches: display all matching executables
-      console.log(); // Move to new line
-      console.log(uniqueHits.join('  ')); // Show matches separated by two spaces
-      this.rl.prompt(); // Return to prompt with the current line
-    }
-
-    // Don't change the input line after displaying completions
+  if (uniqueHits.length === 0) {
+    process.stdout.write("\x07"); // Bell sound
     return [[], line];
   }
 
-  // Find executables in the PATH that match the prefix
-  findExecutablesInPath(prefix) {
-    const pathDirs = process.env.PATH.split(path.delimiter);
-    const executables = [];
-
-    for (const dir of pathDirs) {
-      try {
-        if (!fs.existsSync(dir)) continue;
-        const files = fs.readdirSync(dir);
-        for (const file of files) {
-          if (file.startsWith(prefix)) {
-            const filePath = path.join(dir, file);
-            const stats = fs.statSync(filePath);
-            if (stats.isFile() && (process.platform === 'win32' || (stats.mode & 0o111))) {
-              executables.push(file);
-            }
-          }
-        }
-      } catch (error) {
-        continue;
-      }
+  if (uniqueHits.length === 1) {
+    tabPressCount = 0;
+    return [[uniqueHits[0] + " "], line];
+  } else {
+    if (tabPressCount === 1) {
+      process.stdout.write("\x07");
+      return [[], line];
+    } else if (tabPressCount >= 2) {
+      console.log();
+      console.log(uniqueHits.join("  ")); // Display sorted matches
+      rl.prompt();
+      return [[], line];
     }
-
-    return executables;
+    return [[], line];
   }
+}
 
-  // Handle output redirection
-  handleOutput(output, stdoutFile, stderrFile, appendStdout, appendStderr) {
-    if (stdoutFile) {
-      this.writeToFile(stdoutFile, output + '\n', appendStdout);
-    } else if (stderrFile) {
-      console.log(output);
-      this.writeToFile(stderrFile, '', appendStderr);
-    } else {
-      console.log(output);
-    }
-  }
+/**
+ * Parses input into arguments, respecting POSIX-like quoting rules.
+ */
+function parseArguments(input) {
+  const args = [];
+  let currentArg = "";
+  let inSingleQuotes = false;
+  let inDoubleQuotes = false;
 
-  // Write content to a file
-  writeToFile(file, content, append) {
-    try {
-      this.ensureDirExists(file);
-      if (append) {
-        fs.appendFileSync(file, content);
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+
+    if (char === "\\") {
+      if (i + 1 < input.length) {
+        currentArg += input[++i];
       } else {
-        fs.writeFileSync(file, content);
+        currentArg += "\\";
       }
-    } catch (error) {
-      console.error(`Error writing to ${file}: ${error.message}`);
+      continue;
+    }
+
+    if (char === "'" && !inDoubleQuotes) {
+      inSingleQuotes = !inSingleQuotes;
+      continue;
+    }
+
+    if (char === '"' && !inSingleQuotes) {
+      inDoubleQuotes = !inDoubleQuotes;
+      continue;
+    }
+
+    if (char === " " && !inSingleQuotes && !inDoubleQuotes) {
+      if (currentArg) {
+        args.push(currentArg);
+        currentArg = "";
+      }
+      continue;
+    }
+
+    currentArg += char;
+  }
+
+  if (currentArg) args.push(currentArg);
+  return args;
+}
+
+/**
+ * Parses redirection operators from the input.
+ */
+function parseRedirection(input) {
+  const operators = Array.from(REDIRECTION_OPERATORS).sort(
+    (a, b) => b.length - a.length
+  );
+
+  for (const op of operators) {
+    const parts = input.split(op);
+    if (parts.length > 1) {
+      return {
+        command: parts[0].trim(),
+        operator: op,
+        file: parts.slice(1).join(op).trim(),
+      };
     }
   }
 
-  // Ensure the directory exists
-  ensureDirExists(filePath) {
-    const dir = path.dirname(filePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+  return { command: input, operator: null, file: null };
+}
+
+/**
+ * Ensures a directory exists, creating it if necessary.
+ */
+function ensureDirExists(filePath) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+/**
+ * Writes content to a file, with optional appending.
+ */
+function writeToFile(file, content, append = false) {
+  try {
+    ensureDirExists(file);
+    if (append) {
+      fs.appendFileSync(file, content);
+    } else {
+      fs.writeFileSync(file, content);
+    }
+    return true;
+  } catch (error) {
+    console.error(`Error writing to ${file}: ${error.message}`);
+    return false;
+  }
+}
+
+// ----- Command Handlers -----
+
+function handleExit(args) {
+  const exitCode = args[0] ? parseInt(args[0]) : 0;
+  if (isNaN(exitCode)) {
+    console.error("exit: numeric argument required");
+  } else {
+    process.exit(exitCode);
+  }
+}
+
+function handleCd(args) {
+  const targetDir = args[0] || process.env.HOME;
+  try {
+    process.chdir(targetDir);
+  } catch (error) {
+    console.error(`cd: ${targetDir}: No such file or directory`);
+  }
+}
+
+function handleType(args) {
+  const command = args[0];
+  if (!command) {
+    console.error("Usage: type [command]");
+  } else if (BUILTIN_COMMANDS.has(command)) {
+    console.log(`${command} is a shell builtin`);
+  } else {
+    const paths = process.env.PATH.split(path.delimiter);
+    let found = false;
+    for (const dir of paths) {
+      const fullPath = path.join(dir, command);
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+        console.log(`${command} is ${fullPath}`);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      console.log(`${command}: not found`);
     }
   }
 }
 
-// Create and start the shell
-const shell = new SimpleShell();
-shell.start();
+function handleEcho(args) {
+  console.log(args.join(" "));
+}
+
+function handlePwd() {
+  console.log(process.cwd());
+}
+
+function handleExternalCommand(command, args, redirection) {
+  const paths = process.env.PATH.split(path.delimiter);
+  let found = false;
+
+  for (const dir of paths) {
+    const fullPath = path.join(dir, command);
+    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+      found = true;
+      try {
+        // Configure stdio based on redirection needs
+        const stdio = ["inherit", "pipe", "pipe"]; // Capture both stdout and stderr
+
+        // Execute the command
+        const result = spawnSync(fullPath, args, { encoding: "utf-8", stdio });
+
+        if (result.error) {
+          throw result.error;
+        }
+
+        // Handle stdout redirection if needed
+        if (redirection.operator && redirection.operator.startsWith("1")) {
+          const content = result.stdout || "";
+          const append = redirection.operator.endsWith(">>");
+          writeToFile(redirection.file, content, append);
+        }
+
+        // Handle stderr redirection if needed
+        if (redirection.operator && redirection.operator.startsWith("2")) {
+          const content = result.stderr || "";
+          const append = redirection.operator.endsWith(">>");
+          writeToFile(redirection.file, content, append);
+        }
+
+        // Print non-redirected output to the console
+        if (!redirection.operator || !redirection.operator.startsWith("1")) {
+          process.stdout.write(result.stdout || "");
+        }
+        if (!redirection.operator || !redirection.operator.startsWith("2")) {
+          process.stderr.write(result.stderr || "");
+        }
+      } catch (error) {
+        console.error(`Error executing ${command}: ${error.message}`);
+      }
+      break;
+    }
+  }
+
+  if (!found) {
+    console.error(`${command}: command not found`);
+  }
+}
+
+// ----- Main REPL Loop -----
+
+function prompt() {
+  rl.question("$ ", (answer) => {
+    if (!answer.trim()) {
+      prompt();
+      return;
+    }
+
+    lastTabLine = "";
+    tabPressCount = 0;
+
+    const { command, operator, file } = parseRedirection(answer);
+    const args = parseArguments(command);
+    const cmd = args[0];
+
+    if (!cmd) {
+      prompt();
+      return;
+    }
+
+    switch (cmd) {
+      case "exit":
+        handleExit(args.slice(1));
+        break;
+      case "cd":
+        handleCd(args.slice(1));
+        break;
+      case "type":
+        handleType(args.slice(1));
+        break;
+      case "echo":
+        handleEcho(args.slice(1));
+        break;
+      case "pwd":
+        handlePwd();
+        break;
+      default:
+        handleExternalCommand(cmd, args.slice(1), { operator, file });
+    }
+
+    prompt();
+  });
+}
+
+prompt();
