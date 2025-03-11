@@ -76,7 +76,7 @@ function completer(line) {
     return [[allHits[0]], line];  // Return the matched command without adding extra space
   } else {
     if (tabPressCount >= 2) {
-      console.log(allHits.join("  "));
+      console.log(allHits.join(" "));
       rl.prompt();
       return [[], line];
     }
