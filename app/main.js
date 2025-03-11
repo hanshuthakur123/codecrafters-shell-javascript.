@@ -130,8 +130,8 @@ class Shell {
       // Second tab press: display all matching executables
       console.log();
       console.log(uniqueHits.join('  '));
-      this.rl.prompt();
-      return [[], line];
+      process.stdout.write(`$ ${line}`); // Rewrite the prompt with the current line
+      return [[], line]; // Don't change the line
     }
     
     return [[], line];
