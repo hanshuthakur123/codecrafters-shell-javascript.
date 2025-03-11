@@ -80,7 +80,8 @@ function completer(line) {
       rl.prompt();
       return [[], line];
     }
-    process.stdout.write("\x07");  // Bell sound for multiple matches
+    console.log(allHits.join(" "));  // Print possible completions
+    rl.prompt();
     return [[], line];
   }
 }
