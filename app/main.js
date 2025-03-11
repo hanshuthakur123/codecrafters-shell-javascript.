@@ -78,7 +78,7 @@ function completer(line) {
   );
   const pathExecutables = findExecutablesInPath(trimmedLine);
   const allHits = [...builtinHits, ...pathExecutables];
-  const uniqueHits = [...new Set(allHits)];
+  const uniqueHits = [...new Set(allHits)].sort(); // Sort the matches alphabetically
 
   if (uniqueHits.length === 0) {
     process.stdout.write("\x07"); // Bell sound
@@ -94,7 +94,7 @@ function completer(line) {
       return [[], line];
     } else if (tabPressCount >= 2) {
       console.log();
-      console.log(uniqueHits.join("  "));
+      console.log(uniqueHits.join("  ")); // Display sorted matches
       rl.prompt();
       return [[], line];
     }
