@@ -434,7 +434,7 @@ class SimpleShell {
     
     // If the line is empty, return all builtins
     if (trimmedLine === '') {
-      return [builtins, line];
+      return [builtins.sort(), line];
     }
     
     // Filter builtin commands that start with the current input
@@ -451,8 +451,11 @@ class SimpleShell {
     // Remove duplicates (in case an executable has the same name as a builtin)
     const uniqueHits = [...new Set(allHits)];
     
+    // Sort the hits alphabetically
+    const sortedHits = uniqueHits.sort();
+    
     // If there are no matches, ring the bell
-    if (uniqueHits.length === 0) {
+    if (sortedHits.length === 0) {
       // Ring the bell - try multiple methods to ensure it works
       console.log('\u0007'); // Unicode bell character
       process.stdout.write('\u0007'); // Alternative method
@@ -461,16 +464,16 @@ class SimpleShell {
     }
     
     // If there's exactly one match and it's an exact match, just add a space
-    if (uniqueHits.length === 1 && uniqueHits[0] === trimmedLine) {
-      return [[uniqueHits[0] + ' '], line];
+    if (sortedHits.length === 1 && sortedHits[0] === trimmedLine) {
+      return [[sortedHits[0] + ' '], line];
     }
     
     // If there's exactly one match and it's not an exact match, complete it
-    if (uniqueHits.length === 1 && uniqueHits[0] !== trimmedLine) {
+    if (sortedHits.length === 1 && sortedHits[0] !== trimmedLine) {
       // Only complete on the second tab press
       if (this.tabPressCount >= 2) {
         this.tabPressCount = 0; // Reset counter after completion
-        return [[uniqueHits[0] + ' '], line]; // Add a space after the completed command
+        return [[sortedHits[0] + ' '], line]; // Add a space after the completed command
       } else {
         // First tab press: only ring the bell
         process.stdout.write('\u0007'); // Bell character
@@ -485,7 +488,7 @@ class SimpleShell {
       } else if (this.tabPressCount >= 2) {
         // Second tab press: display all matching executables
         console.log(); // Move to new line
-        console.log(uniqueHits.join('  ')); // Show matches separated by two spaces
+        console.log(sortedHits.join('  ')); // Show matches separated by two spaces
         this.rl.prompt(); // Return to prompt with the current line
         
         // Don't change the input line after displaying completions
