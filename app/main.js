@@ -460,10 +460,22 @@ class SimpleShell {
       return [[], line]; // Return the original line unchanged
     }
     
-    // If there's exactly one match, return it plus a space
-    if (uniqueHits.length === 1) {
-      this.tabPressCount = 0; // Reset counter after completion
-      return [[uniqueHits[0] + ' '], line]; // Add a space after the completed command
+    // If there's exactly one match and it's an exact match, just add a space
+    if (uniqueHits.length === 1 && uniqueHits[0] === trimmedLine) {
+      return [[uniqueHits[0] + ' '], line];
+    }
+    
+    // If there's exactly one match and it's not an exact match, complete it
+    if (uniqueHits.length === 1 && uniqueHits[0] !== trimmedLine) {
+      // Only complete on the second tab press
+      if (this.tabPressCount >= 2) {
+        this.tabPressCount = 0; // Reset counter after completion
+        return [[uniqueHits[0] + ' '], line]; // Add a space after the completed command
+      } else {
+        // First tab press: only ring the bell
+        process.stdout.write('\u0007'); // Bell character
+        return [[], line]; // Don't change the line
+      }
     } else {
       // Multiple matches
       if (this.tabPressCount === 1) {
