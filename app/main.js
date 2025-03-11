@@ -130,8 +130,13 @@ class Shell {
       // Second tab press: display all matching executables
       console.log();
       console.log(uniqueHits.join('  '));
-      process.stdout.write(`$ ${line}`); // Rewrite the prompt with the current line
-      return [[], line]; // Don't change the line
+      
+      // Important fix: Use process.stdout.write to maintain the prompt with
+      // original input after showing completions
+      process.stdout.write(`$ ${line}`);
+      
+      // Return empty array to keep the original line
+      return [[], line];
     }
     
     return [[], line];
@@ -416,7 +421,6 @@ class Shell {
    * Ring the terminal bell
    */
   ringBell() {
-    console.log('\u0007');
     process.stdout.write('\u0007');
   }
 
