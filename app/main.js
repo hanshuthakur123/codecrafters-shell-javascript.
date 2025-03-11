@@ -221,43 +221,48 @@ class SimpleShell {
 
   tabCompleter(line) {
     const trimmedLine = line.trim();
-
+  
     if (trimmedLine === this.lastTabLine) {
       this.tabPressCount++;
     } else {
       this.tabPressCount = 1;
       this.lastTabLine = trimmedLine;
     }
-
+  
+    // Find all possible completions
     const builtins = Object.keys(this.builtinCommands);
     const builtinHits = builtins.filter(builtin => builtin.startsWith(trimmedLine));
     const pathExecutables = this.findExecutablesInPath(trimmedLine);
     const allHits = [...builtinHits, ...pathExecutables];
     const uniqueHits = [...new Set(allHits)];
-
+  
     if (uniqueHits.length === 0) {
-      process.stdout.write('\u0007');
-      return [[], line];
+      // No matches: ring the bell
+      process.stdout.write('\u0007'); // Bell character
+      return [[], line]; // Return the original line unchanged
     }
-
+  
     if (uniqueHits.length === 1) {
-      this.tabPressCount = 0;
-      return [[uniqueHits[0] + ' '], line];
+      // Single match: complete the command and add a space
+      this.tabPressCount = 0; // Reset counter after completion
+      return [[uniqueHits[0] + ' '], line]; // Add a space after the completed command
     }
-
+  
     if (this.tabPressCount >= 2) {
-      console.log();
-      console.log(uniqueHits.join('  '));
-      this.rl.prompt();
+      // Multiple matches: display all matching executables
+      console.log(); // Move to new line
+      console.log(uniqueHits.join('  ')); // Show matches separated by two spaces
+      this.rl.prompt(); // Return to prompt with the current line
     }
-
+  
+    // Don't change the input line after displaying completions
     return [[], line];
   }
 
   findExecutablesInPath(prefix) {
     const pathDirs = process.env.PATH.split(path.delimiter);
     const executables = [];
-
+  
     for (const dir of pathDirs) {
       try {
         if (!fs.existsSync(dir)) continue;
@@ -275,7 +280,7 @@ class SimpleShell {
         continue;
       }
     }
-
+  
     return executables;
   }
 
