@@ -67,20 +67,20 @@ function completer(line) {
   const allHits = [...builtinHits, ...pathExecutables];
 
   if (!allHits.length) {
-    process.stdout.write("\x07");
+    process.stdout.write("\x07");  // Bell sound if no matches
     return [[], line];
   }
 
   if (allHits.length === 1) {
     tabPressCount = 0;
-    return [[allHits[0] + " "], line];
+    return [[allHits[0]], line];  // Return the matched command without adding extra space
   } else {
     if (tabPressCount >= 2) {
       console.log(allHits.join("  "));
       rl.prompt();
       return [[], line];
     }
-    process.stdout.write("\x07");
+    process.stdout.write("\x07");  // Bell sound for multiple matches
     return [[], line];
   }
 }
