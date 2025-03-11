@@ -258,35 +258,18 @@ function handleExternalCommand(command, args, redirection) {
     if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
       found = true;
       try {
-        // Configure stdio based on redirection needs
-        const stdio = ["inherit", "pipe", "pipe"]; // Capture both stdout and stderr
+        const result = spawnSync(fullPath, args, {
+          encoding: "utf-8",
+          stdio: ["inherit", "pipe", "pipe"],
+        });
 
-        // Execute the command
-        const result = spawnSync(fullPath, args, { encoding: "utf-8", stdio });
-
-        if (result.error) {
-          throw result.error;
-        }
-
-        // Handle stdout redirection if needed
-        if (redirection.operator && redirection.operator.startsWith("1")) {
-          const content = result.stdout || "";
+        if (redirection.operator) {
+          const content =
+            redirection.operator.startsWith("2") ? result.stderr : result.stdout;
           const append = redirection.operator.endsWith(">>");
           writeToFile(redirection.file, content, append);
-        }
-
-        // Handle stderr redirection if needed
-        if (redirection.operator && redirection.operator.startsWith("2")) {
-          const content = result.stderr || "";
-          const append = redirection.operator.endsWith(">>");
-          writeToFile(redirection.file, content, append);
-        }
-
-        // Print non-redirected output to the console
-        if (!redirection.operator || !redirection.operator.startsWith("1")) {
+        } else {
           process.stdout.write(result.stdout || "");
-        }
-        if (!redirection.operator || !redirection.operator.startsWith("2")) {
           process.stderr.write(result.stderr || "");
         }
       } catch (error) {
