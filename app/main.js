@@ -315,7 +315,6 @@ function handleExternalCommand(command, args, redirection) {
     console.error(`${command}: command not found`);
   }
 }
-
 // ----- Main REPL Loop -----
 
 function prompt() {
