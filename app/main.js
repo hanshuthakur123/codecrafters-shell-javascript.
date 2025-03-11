@@ -259,34 +259,49 @@ function handleExternalCommand(command, args, redirection) {
       found = true;
       try {
         // Configure stdio based on redirection needs
-        const stdio = ["inherit", "pipe", "pipe"]; // Capture both stdout and stderr
+        let stdio;
+        if (redirection.operator && redirection.file) {
+          stdio = ["inherit", "pipe", "pipe"]; // Capture both stdout and stderr
+        } else {
+          stdio = "inherit"; // No redirection
+        }
 
         // Execute the command
-        const result = spawnSync(fullPath, args, { encoding: "utf-8", stdio });
+        const result = spawnSync(fullPath, args, {
+          encoding: "utf-8",
+          stdio: stdio,
+        });
 
         if (result.error) {
           throw result.error;
         }
 
-        // Handle stdout redirection if needed
-        if (redirection.operator && redirection.operator.startsWith("1")) {
-          const content = result.stdout || "";
-          const append = redirection.operator.endsWith(">>");
-          writeToFile(redirection.file, content, append);
-        }
+        // Handle redirection
+        if (redirection.operator && redirection.file) {
+          let content = "";
+          if (redirection.operator.startsWith("2")) {
+            // Redirect stderr
+            content = result.stderr || "";
+          } else {
+            // Redirect stdout
+            content = result.stdout || "";
+          }
 
-        // Handle stderr redirection if needed
-        if (redirection.operator && redirection.operator.startsWith("2")) {
-          const content = result.stderr || "";
+          // Determine if we should append or overwrite
           const append = redirection.operator.endsWith(">>");
-          writeToFile(redirection.file, content, append);
-        }
 
-        // Print non-redirected output to the console
-        if (!redirection.operator || !redirection.operator.startsWith("1")) {
+          // Ensure the directory exists
+          ensureDirExists(redirection.file);
+
+          // Write to the file
+          if (append) {
+            fs.appendFileSync(redirection.file, content);
+          } else {
+            fs.writeFileSync(redirection.file, content);
+          }
+        } else {
+          // No redirection, print output to console
           process.stdout.write(result.stdout || "");
-        }
-        if (!redirection.operator || !redirection.operator.startsWith("2")) {
           process.stderr.write(result.stderr || "");
         }
       } catch (error) {
