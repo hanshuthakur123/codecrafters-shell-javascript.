@@ -454,8 +454,7 @@ class SimpleShell {
     // If there are no matches, ring the bell
     if (uniqueHits.length === 0) {
       // Ring the bell - try multiple methods to ensure it works
-      console.log('\u0007'); // Unicode bell character
-      process.stdout.write('\u0007'); // Alternative method
+      process.stdout.write('\u0007'); // Unicode bell character
       
       return [[], line]; // Return the original line unchanged
     }
