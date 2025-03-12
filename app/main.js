@@ -258,49 +258,17 @@ function handleExternalCommand(command, args, redirection) {
     if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
       found = true;
       try {
-        // Configure stdio based on redirection needs
-        let stdio;
-        if (redirection.operator && redirection.file) {
-          stdio = ["inherit", "pipe", "pipe"]; // Capture both stdout and stderr
-        } else {
-          stdio = "inherit"; // No redirection
-        }
-
-        // Execute the command
         const result = spawnSync(fullPath, args, {
           encoding: "utf-8",
-          stdio: stdio,
+          stdio: ["inherit", "pipe", "pipe"],
         });
 
-        if (result.error) {
-          throw result.error;
-        }
-
-        // Handle redirection
-        if (redirection.operator && redirection.file) {
-          let content = "";
-          if (redirection.operator.startsWith("2")) {
-            // Redirect stderr
-            content = result.stderr || "";
-          } else {
-            // Redirect stdout
-            content = result.stdout || "";
-          }
-
-          // Determine if we should append or overwrite
+        if (redirection.operator) {
+          const content =
+            redirection.operator.startsWith("2") ? result.stderr : result.stdout;
           const append = redirection.operator.endsWith(">>");
-
-          // Ensure the directory exists
-          ensureDirExists(redirection.file);
-
-          // Write to the file
-          if (append) {
-            fs.appendFileSync(redirection.file, content);
-          } else {
-            fs.writeFileSync(redirection.file, content);
-          }
+          writeToFile(redirection.file, content, append);
         } else {
-          // No redirection, print output to console
           process.stdout.write(result.stdout || "");
           process.stderr.write(result.stderr || "");
         }
