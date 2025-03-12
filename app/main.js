@@ -140,7 +140,7 @@ class SimpleShell {
       ];
 
       // Execute the command
-      const result = spawnSync(command, args, { stdio });
+      const result = spawnSync(command, args, { stdio, encoding: 'utf-8' });
 
       if (result.error) {
         throw result.error;
@@ -154,6 +154,14 @@ class SimpleShell {
       // Handle stderr redirection
       if (stderrFile && result.stderr) {
         this.writeToFile(stderrFile, result.stderr, appendStderr);
+      }
+
+      // Print non-redirected output to console
+      if (!stdoutFile && result.stdout) {
+        process.stdout.write(result.stdout);
+      }
+      if (!stderrFile && result.stderr) {
+        process.stderr.write(result.stderr);
       }
     } catch (error) {
       console.error(`Error executing ${command}: ${error.message}`);
