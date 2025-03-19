@@ -25,8 +25,7 @@ function completer(line) {
       const matchesString = commands.join(" "); // Join matches with spaces
       console.log(matchesString); // Print the matches
       process.stdout.write('\x07'); // Ring the bell
-     
-   //   tabPressCount = 0; // Reset tab press count
+      tabPressCount = 0; // Reset tab press count
     } else {
       tabPressCount++; // Increment tab press count
     }
