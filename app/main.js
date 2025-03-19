@@ -3,24 +3,15 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 const { execFileSync, spawnSync } = require("node:child_process");
-
-// Constants
 const HOMEDIR = process.env.HOME || process.env.USERPROFILE || os.homedir();
-const BUILTIN_COMMANDS = ["exit", "echo", "type", "pwd", "cd", "cat"];
-const REDIRECT_OPERATORS = ["2>>", "1>>", "2>", "1>", ">>", ">"];
-
-// Readline Interface
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
     completer: completer,
     prompt: "$ ",
 });
-
 let lastTabInput = "";
 let tabPressCount = 0;
-
-// Utility Functions
 function longestCommonPrefix(strings) {
     if (strings.length === 0) return "";
     let prefix = strings[0];
@@ -32,695 +23,127 @@ function longestCommonPrefix(strings) {
     }
     return prefix;
 }
-
 function completer(line) {
-  const paths = process.env.PATH.split(":");
-  const executables = new Set();
-
-  // Collect executable files from PATH directories
-  for (const dir of paths) {
-      try {
-          const files = fs.readdirSync(dir);
-          for (const file of files) {
-              const fullPath = path.join(dir, file);
-              try {
-                  fs.accessSync(fullPath, fs.constants.X_OK);
-                  const stats = fs.statSync(fullPath);
-                  if (stats.isFile()) {
-                      executables.add(file);
-                  }
-              } catch (e) {
-                  // Skip non-executable files
-              }
-          }
-      } catch (e) {
-          // Skip inaccessible directories
-      }
-  }
-
-  const allCommands = [...BUILTIN_COMMANDS, ...executables].sort();
-  const currentInput = line.trim();
-  const hits = allCommands.filter((cmd) => cmd.startsWith(currentInput)).sort();
-
-  if (hits.length === 0) {
-      process.stdout.write("\x07"); // Ring the bell for no matches
-      return [[], line];
-  }
-
-  const lcp = longestCommonPrefix(hits);
-  if (lcp.length > currentInput.length) {
-      const hasLongerCommands = hits.some((cmd) => cmd.startsWith(lcp) && cmd.length > lcp.length);
-      if (hasLongerCommands) {
-          return [[lcp], line]; // Complete to the longest common prefix
-      } else {
-          return [[lcp + " "], line]; // Complete and add a space
-      }
-  } else {
-      if (hits.length === 1) {
-          return [[hits[0] + " "], line]; // Complete the single match
-      } else {
-          if (currentInput === lastTabInput && tabPressCount === 1) {
-              // Display the list of matches on the second TAB press
-              process.stdout.write("\n" + hits.join("  ") + "\n");
-              rl.prompt(true); // Reset the prompt
-              lastTabInput = "";
-              tabPressCount = 0;
-              return [[], line];
-          } else {
-              // Ring the bell on the first TAB press
-              process.stdout.write("\x07");
-              lastTabInput = currentInput;
-              tabPressCount = 1;
-              return [[], line];
-          }
-      }
-  }
-}const readline = require("readline/promises");
-const path = require("path");
-const os = require("os");
-const fs = require("fs");
-const { execFileSync, spawnSync } = require("node:child_process");
-
-
-// Readline Interface
-
-
-// Utility Functions
-function longestCommonPrefix(strings) {
-    if (strings.length === 0) return "";
-    let prefix = strings[0];
-    for (let i = 1; i < strings.length; i++) {
-        while (strings[i].indexOf(prefix) !== 0) {
-            prefix = prefix.slice(0, -1);
-            if (prefix === "") return "";
-        }
-    }
-    return prefix;
-}
-
-function completer(line) {
-  const paths = process.env.PATH.split(":");
-  const executables = new Set();
-
-  // Collect executable files from PATH directories
-  for (const dir of paths) {
-      try {
-          const files = fs.readdirSync(dir);
-          for (const file of files) {
-              const fullPath = path.join(dir, file);
-              try {
-                  fs.accessSync(fullPath, fs.constants.X_OK);
-                  const stats = fs.statSync(fullPath);
-                  if (stats.isFile()) {
-                      executables.add(file);
-                  }
-              } catch (e) {
-                  // Skip non-executable files
-              }
-          }
-      } catch (e) {
-          // Skip inaccessible directories
-      }
-  }
-
-  const allCommands = [...BUILTIN_COMMANDS, ...executables].sort();
-  const currentInput = line.trim();
-  const hits = allCommands.filter((cmd) => cmd.startsWith(currentInput)).sort();
-
-  if (hits.length === 0) {
-      process.stdout.write("\x07"); // Ring the bell for no matches
-      return [[], line];
-  }
-
-  const lcp = longestCommonPrefix(hits);
-  if (lcp.length > currentInput.length) {
-      const hasLongerCommands = hits.some((cmd) => cmd.startsWith(lcp) && cmd.length > lcp.length);
-      if (hasLongerCommands) {
-          return [[lcp], line]; // Complete to the longest common prefix
-      } else {
-          return [[lcp + " "], line]; // Complete and add a space
-      }
-  } else {
-      if (hits.length === 1) {
-          return [[hits[0] + " "], line]; // Complete the single match
-      } else {
-          if (currentInput === lastTabInput && tabPressCount === 1) {
-              // Display the list of matches on the second TAB press
-              process.stdout.write("\n" + hits.join("  ") + "\n");
-              rl.prompt(true); // Reset the prompt
-              lastTabInput = "";
-              tabPressCount = 0;
-              return [[], line];
-          } else {
-              // Ring the bell on the first TAB press
-              process.stdout.write("\x07");
-              lastTabInput = currentInput;
-              tabPressCount = 1;
-              return [[], line];
-          }
-      }
-  }
-}
-
-function parseArgs(input) {
-    let args = [];
-    let current = [];
-    let inSingle = false;
-    let inDouble = false;
-    let escapeNext = false;
-
-    for (let i = 0; i < input.length; i++) {
-        let ch = input[i];
-        if (escapeNext) {
-            if (inDouble && ["$", "`", '"', "\\", "\n"].includes(ch)) {
-                current.push(ch);
-            } else {
-                current.push("\\", ch);
-            }
-            escapeNext = false;
-            continue;
-        }
-
-        if (ch === "\\") {
-            if (!inSingle) escapeNext = true;
-            else current.push(ch);
-            continue;
-        }
-
-        if (ch === "'" && !inDouble) {
-            inSingle = !inSingle;
-            continue;
-        }
-
-        if (ch === '"' && !inSingle) {
-            inDouble = !inDouble;
-            continue;
-        }
-
-        if (ch === " " && !inSingle && !inDouble) {
-            if (current.length > 0) {
-                args.push(current.join(""));
-                current = [];
-            }
-            continue;
-        }
-
-        current.push(ch);
-    }
-
-    if (current.length > 0) {
-        args.push(current.join(""));
-    }
-
-    return args;
-}
-
-// Command Handlers
-function handleEcho(args) {
-    process.stdout.write(args.slice(1).join(" ") + "\n");
-}
-
-function handleExit() {
-    rl.close();
-}
-
-function handleType(args) {
-    const command = args[1];
-    if (BUILTIN_COMMANDS.includes(command.toLowerCase())) {
-        process.stdout.write(`${command} is a shell builtin\n`);
-    } else {
-        const paths = process.env.PATH.split(":");
-        for (const p of paths) {
-            let destPath = path.join(p, command);
-            if (fs.existsSync(destPath)) {
-                process.stdout.write(`${command} is ${destPath}\n`);
-                return;
-            }
-        }
-        process.stdout.write(`${command}: not found\n`);
-    }
-}
-
-function handlePWD() {
-    process.stdout.write(`${process.cwd()}\n`);
-}
-
-function handleChangeDirectory(args) {
-    const directory = args[1] || HOMEDIR;
-    try {
-        process.chdir(directory);
-    } catch (err) {
-        process.stdout.write(`cd: ${directory}: No such file or directory\n`);
-    }
-}
-
-function handleReadFile(args) {
-    if (args.length < 2) {
-        console.error("cat: missing file operand");
-        return;
-    }
-
-    for (const filePath of args.slice(1)) {
-        try {
-            const data = fs.readFileSync(filePath, "utf-8");
-            process.stdout.write(data);
-        } catch (err) {
-            console.error(`cat: ${filePath}: ${err.code === "ENOENT" ? "No such file or directory" : "Permission denied"}`);
-        }
-    }
-}
-
-function handleFile(args) {
-    const executable = args[0];
+    const builtins = ["exit", "echo", "type", "pwd", "cd", "cat"];
     const paths = process.env.PATH.split(":");
-    for (const pathEnv of paths) {
-        let destPath = path.join(pathEnv, executable);
-        if (fs.existsSync(destPath)) {
-            execFileSync(destPath, args.slice(1), {
-                encoding: "utf-8",
-                stdio: "pipe",
-                argv0: executable,
-            });
-            return;
-        }
-    }
-    process.stdout.write(`${executable}: command not found\n`);
-}
-
-function handleRedirect(args) {
-    const opIndex = args.findIndex((arg) => REDIRECT_OPERATORS.includes(arg));
-    if (opIndex === -1 || opIndex === args.length - 1) return;
-
-    const op = args[opIndex];
-    const filename = args[opIndex + 1];
-    const commandParts = args.slice(0, opIndex);
-
-    if (commandParts.length === 0) return;
-
-    const isAppend = op.endsWith(">>");
-    const isStderr = op.startsWith("2");
-    const flag = isAppend ? "a" : "w";
-
-    const result = spawnSync(commandParts[0], commandParts.slice(1), {
-        encoding: "utf-8",
-        stdio: ["inherit", "pipe", "pipe"],
-    });
-
-    try {
-        fs.mkdirSync(path.dirname(filename), { recursive: true });
-        const content = (isStderr ? result.stderr : result.stdout) || "";
-        fs.writeFileSync(filename, content, { flag, mode: 0o644 });
-
-        const consoleStream = isStderr ? process.stdout : process.stderr;
-        const consoleOutput = isStderr ? result.stdout : result.stderr;
-        if (consoleOutput) consoleStream.write(consoleOutput);
-    } catch (err) {
-        process.stderr.write(`${commandParts[0]}: ${filename}: ${err.message}\n`);
-    }
-}
-
-// Main Input Handler
-function handleInput(line) {
-    const args = parseArgs(line);
-    if (args.length === 0) {
-        rl.prompt();
-        return;
-    }
-
-    const cmd = args[0]?.toLowerCase();
-
-    const hasRedirect = args.some((arg) => REDIRECT_OPERATORS.includes(arg));
-   
-
-    if (hasRedirect) {
-        handleRedirect(args);
-        handleRedirect(args);const readline = require("readline/promises");
-const path = require("path");
-const os = require("os");
-const fs = require("fs");
-const { execFileSync, spawnSync } = require("node:child_process");
-
-// Constants
-const HOMEDIR = process.env.HOME || process.env.USERPROFILE || os.homedir();
-const BUILTIN_COMMANDS = ["exit", "echo", "type", "pwd", "cd", "cat"];
-const REDIRECT_OPERATORS = ["2>>", "1>>", "2>", "1>", ">>", ">"];
-
-// Readline Interface
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    completer: completer,
-    prompt: "$ ",
-});
-
-let lastTabInput = "";
-let tabPressCount = 0;
-
-// Utility Functions
-function longestCommonPrefix(strings) {
-    if (strings.length === 0) return "";
-    let prefix = strings[0];
-    for (let i = 1; i < strings.length; i++) {
-        while (strings[i].indexOf(prefix) !== 0) {
-            prefix = prefix.slice(0, -1);
-            if (prefix === "") return "";
-        }
-    }
-    return prefix;
-}
-
-function completer(line) {
-  const paths = process.env.PATH.split(":");
-  const executables = new Set();
-
-  // Collect executable files from PATH directories
-  for (const dir of paths) {
-      try {
-          const files = fs.readdirSync(dir);
-          for (const file of files) {
-              const fullPath = path.join(dir, file);
-              try {
-                  fs.accessSync(fullPath, fs.constants.X_OK);
-                  const stats = fs.statSync(fullPath);
-                  if (stats.isFile()) {
-                      executables.add(file);
-                  }
-              } catch (e) {
-                  // Skip non-executable files
-              }
-          }
-      } catch (e) {
-          // Skip inaccessible directories
-      }
-  }
-
-  const allCommands = [...BUILTIN_COMMANDS, ...executables].sort();
-  const currentInput = line.trim();
-  const hits = allCommands.filter((cmd) => cmd.startsWith(currentInput)).sort();
-
-  if (hits.length === 0) {
-      process.stdout.write("\x07"); // Ring the bell for no matches
-      return [[], line];
-  }
-
-  const lcp = longestCommonPrefix(hits);
-  if (lcp.length > currentInput.length) {
-      const hasLongerCommands = hits.some((cmd) => cmd.startsWith(lcp) && cmd.length > lcp.length);
-      if (hasLongerCommands) {
-          return [[lcp], line]; // Complete to the longest common prefix
-      } else {
-          return [[lcp + " "], line]; // Complete and add a space
-      }
-  } else {
-      if (hits.length === 1) {
-          return [[hits[0] + " "], line]; // Complete the single match
-      } else {
-          if (currentInput === lastTabInput && tabPressCount === 1) {
-              // Display the list of matches on the second TAB press
-              process.stdout.write("\n" + hits.join("  ") + "\n");
-              rl.prompt(true); // Reset the prompt
-              lastTabInput = "";
-              tabPressCount = 0;
-              return [[], line];
-          } else {
-              // Ring the bell on the first TAB press
-              process.stdout.write("\x07");
-              lastTabInput = currentInput;
-              tabPressCount = 1;
-              return [[], line];
-          }
-      }
-  }
-}
-
-function parseArgs(input) {
-    let args = [];
-    let current = [];
-    let inSingle = false;
-    let inDouble = false;
-    let escapeNext = false;
-
-    for (let i = 0; i < input.length; i++) {
-        let ch = input[i];
-        if (escapeNext) {
-            if (inDouble && ["$", "`", '"', "\\", "\n"].includes(ch)) {
-                current.push(ch);
-            } else {
-                current.push("\\", ch);
-            }
-            escapeNext = false;
-            continue;
-        }
-
-        if (ch === "\\") {
-            if (!inSingle) escapeNext = true;
-            else current.push(ch);
-            continue;
-        }
-
-        if (ch === "'" && !inDouble) {
-            inSingle = !inSingle;
-            continue;
-        }
-
-        if (ch === '"' && !inSingle) {
-            inDouble = !inDouble;
-            continue;
-        }
-
-        if (ch === " " && !inSingle && !inDouble) {
-            if (current.length > 0) {
-                args.push(current.join(""));
-                current = [];
-            }
-            continue;
-        }
-
-        current.push(ch);
-    }
-
-    if (current.length > 0) {
-        args.push(current.join(""));
-    }
-
-    return args;
-}
-
-// Command Handlers
-function handleEcho(args) {
-    process.stdout.write(args.slice(1).join(" ") + "\n");
-}
-
-function handleExit() {
-    rl.close();
-}
-
-function handleType(args) {
-    const command = args[1];
-    if (BUILTIN_COMMANDS.includes(command.toLowerCase())) {
-        process.stdout.write(`${command} is a shell builtin\n`);
-    } else {
-        const paths = process.env.PATH.split(":");
-        for (const p of paths) {
-            let destPath = path.join(p, command);
-            if (fs.existsSync(destPath)) {
-                process.stdout.write(`${command} is ${destPath}\n`);
-                return;
-            }
-        }
-        process.stdout.write(`${command}: not found\n`);
-    }
-}
-
-function handlePWD() {
-    process.stdout.write(`${process.cwd()}\n`);
-}
-
-function handleChangeDirectory(args) {
-    const directory = args[1] || HOMEDIR;
-    try {
-        process.chdir(directory);
-    } catch (err) {
-        process.stdout.write(`cd: ${directory}: No such file or directory\n`);
-    }
-}
-
-function handleReadFile(args) {
-    if (args.length < 2) {
-        console.error("cat: missing file operand");
-        return;
-    }
-
-    for (const filePath of args.slice(1)) {
+    const executables = new Set();
+    // Collect executable files from PATH directories
+    for (const dir of paths) {
         try {
-            const data = fs.readFileSync(filePath, "utf-8");
-            process.stdout.write(data);
-        } catch (err) {
-            console.error(`cat: ${filePath}: ${err.code === "ENOENT" ? "No such file or directory" : "Permission denied"}`);
+            const files = fs.readdirSync(dir);
+            for (const file of files) {
+                const fullPath = path.join(dir, file);
+                try {
+                    fs.accessSync(fullPath, fs.constants.X_OK);
+                    const stats = fs.statSync(fullPath);
+                    if (stats.isFile()) {
+                        executables.add(file);
+                    }
+                } catch (e) {
+                    // Skip non-executable files
+                }
+            }
+        } catch (e) {
+            // Skip inaccessible directories
         }
     }
-}
-
-function handleFile(args) {
-    const executable = args[0];
-    const paths = process.env.PATH.split(":");
-    for (const pathEnv of paths) {
-        let destPath = path.join(pathEnv, executable);
-        if (fs.existsSync(destPath)) {
-            execFileSync(destPath, args.slice(1), {
-                encoding: "utf-8",
-                stdio: "pipe",
-                argv0: executable,
-            });
-            return;
-        }
+    const allCommands = [...builtins, ...executables].sort();
+    const currentInput = line.trim();
+    const hits = allCommands
+        .filter((cmd) => cmd.startsWith(currentInput))
+        .sort();
+    if (hits.length === 0) {
+        process.stdout.write("\x07");
+        return [[], line];
     }
-    process.stdout.write(`${executable}: command not found\n`);
-}
-
-function handleRedirect(args) {
-    const opIndex = args.findIndex((arg) => REDIRECT_OPERATORS.includes(arg));
-    if (opIndex === -1 || opIndex === args.length - 1) return;
-
-    const op = args[opIndex];
-    const filename = args[opIndex + 1];
-    const commandParts = args.slice(0, opIndex);
-
-    if (commandParts.length === 0) return;
-
-    const isAppend = op.endsWith(">>");
-    const isStderr = op.startsWith("2");
-    const flag = isAppend ? "a" : "w";
-
-    const result = spawnSync(commandParts[0], commandParts.slice(1), {
-        encoding: "utf-8",
-        stdio: ["inherit", "pipe", "pipe"],
-    });
-
-    try {
-        fs.mkdirSync(path.dirname(filename), { recursive: true });
-        const content = (isStderr ? result.stderr : result.stdout) || "";
-        fs.writeFileSync(filename, content, { flag, mode: 0o644 });
-
-        const consoleStream = isStderr ? process.stdout : process.stderr;
-        const consoleOutput = isStderr ? result.stdout : result.stderr;
-        if (consoleOutput) consoleStream.write(consoleOutput);
-    } catch (err) {
-        process.stderr.write(`${commandParts[0]}: ${filename}: ${err.message}\n`);
-    }
-}
-
-// Main Input Handler
-function handleInput(line) {
-    const args = parseArgs(line);
-    if (args.length === 0) {
+    const lcp = longestCommonPrefix(hits);
+    if (lcp.length > currentInput.length) {
+        const hasLongerCommands = hits.some(
+            (cmd) => cmd.startsWith(lcp) && cmd.length > lcp.length
+        );
+        if (hasLongerCommands) {
+            // Complete to LCP without space
+            return [[lcp], line];
         } else {
-        switch (cmd) {
-            case "exit":
-                handleExit();
-                break;
-            case "echo":
-                handleEcho(args);
-                break;
-            case "type":
-                handleType(args);
-                break;
-            case "pwd":
-                handlePWD();
-                break;
-            case "cd":
-                handleChangeDirectory(args);
-                break;
-            case "cat":
-                handleReadFile(args);
-                break;
-            default:
-                handleFile(args);
+            // Complete to LCP with space
+            return [[lcp + " "], line];
         }
-    }
-        return;
-    }
-
-    const cmd = args[0]?.toLowerCase();
-    const hasRedirect = args.some((arg) => REDIRECT_OPERATORS.includes(arg));
-
-    if (hasRedirect) {
-        handleRedirect(args);
     } else {
-        switch (cmd) {
-            case "exit":
-                handleExit();
-                break;
-            case "echo":
-                handleEcho(args);
-                break;
-            case "type":
-                handleType(args);
-                break;
-            case "pwd":
-                handlePWD();
-                break;
-            case "cd":
-                handleChangeDirectory(args);
-                break;
-            case "cat":
-                handleReadFile(args);
-                break;
-            default:
-                handleFile(args);
+        if (hits.length === 1) {
+            return [[hits[0] + " "], line];
+        } else {
+            // Handle multiple matches
+            if (currentInput === lastTabInput && tabPressCount === 1) {
+                // Show matches
+                process.stdout.write("\n" + hits.join("  ") + "\n");
+                rl.prompt(true);
+                lastTabInput = "";
+                tabPressCount = 0;
+                return [[], line];
+            } else {
+                // Ring bell for first tab
+                process.stdout.write("\x07");
+                lastTabInput = currentInput;
+                tabPressCount = 1;
+                return [[], line];
+            }
         }
     }
-
-    rl.prompt();
 }
-
-// Event Listeners
-rl.on("line", handleInput);
-rl.on("close", () => process.exit(0));
-
-// Start REPL
-
-// Event Listeners
-rl.on("line", handleInput);
-rl.on("close", () => process.exit(0));
-
-// Start REPL
-rl.prompt();
+/**
+ * parseArgs: split the input into arguments following POSIX-like quoting rules.
+ *
+ * Rules:
+ * - Outside quotes, a backslash escapes the next character.
+ * - Inside double quotes, a backslash only escapes $, `, ", \, or newline.
+ * - Inside single quotes, everything is literal.
+ */
 function parseArgs(input) {
     let args = [];
     let current = [];
     let inSingle = false;
     let inDouble = false;
     let escapeNext = false;
-
     for (let i = 0; i < input.length; i++) {
         let ch = input[i];
         if (escapeNext) {
-            if (inDouble && ["$", "`", '"', "\\", "\n"].includes(ch)) {
-                current.push(ch);
+            if (inDouble) {
+                // In double quotes, only these characters are specially escaped.
+                if (
+                    ch === "$" ||
+                    ch === "`" ||
+                    ch === '"' ||
+                    ch === "\\" ||
+                    ch === "\n"
+                ) {
+                    current.push(ch);
+                } else {
+                    // Otherwise, leave the backslash in.
+                    current.push("\\", ch);
+                }
             } else {
-                current.push("\\", ch);
+                current.push(ch);
             }
             escapeNext = false;
             continue;
         }
-
         if (ch === "\\") {
-            if (!inSingle) escapeNext = true;
-            else current.push(ch);
+            // If in single quotes, backslash is literal.
+            if (inSingle) {
+                current.push(ch);
+            } else {
+                escapeNext = true;
+            }
             continue;
         }
-
         if (ch === "'" && !inDouble) {
             inSingle = !inSingle;
-            continue;
+            continue; // do not include the outer single quotes
         }
-
         if (ch === '"' && !inSingle) {
             inDouble = !inDouble;
-            continue;
+            continue; // do not include the outer double quotes
         }
-
         if (ch === " " && !inSingle && !inDouble) {
             if (current.length > 0) {
                 args.push(current.join(""));
@@ -728,35 +151,85 @@ function parseArgs(input) {
             }
             continue;
         }
-
         current.push(ch);
     }
-
     if (current.length > 0) {
         args.push(current.join(""));
     }
-
     return args;
 }
-
-// Command Handlers
-function handleEcho(args) {
-    process.stdout.write(args.slice(1).join(" ") + "\n");
+function handleRedirect(answer) {
+    // Determine which redirection operator is present.
+    const parts = parseArgs(answer);
+    const operators = ["2>>", "1>>", "2>", "1>", ">>", ">"];
+    let op = null;
+    let opIndex = -1;
+    // Find the last valid operator in the parsed arguments
+    for (let i = 0; i < parts.length; i++) {
+        if (operators.includes(parts[i])) {
+            op = parts[i];
+            opIndex = i;
+        }
+    }
+    if (!op || opIndex === parts.length - 1) return;
+    const filename = parts[opIndex + 1];
+    const commandParts = parts.slice(0, opIndex);
+    if (commandParts.length === 0) return;
+    // Determine operation parameters
+    const isAppend = op.endsWith(">>");
+    const isStderr = op.startsWith("2");
+    const flag = isAppend ? "a" : "w";
+    // Execute command
+    const result = spawnSync(commandParts[0], commandParts.slice(1), {
+        encoding: "utf-8",
+        stdio: ["inherit", "pipe", "pipe"],
+    });
+    try {
+        // Always create directory structure
+        fs.mkdirSync(path.dirname(filename), { recursive: true });
+        // Get content to write (empty string if undefined)
+        const content = (isStderr ? result.stderr : result.stdout) || "";
+        // Always write to file (creates empty file if needed)
+        fs.writeFileSync(filename, content, {
+            flag: flag,
+            mode: 0o644,
+        });
+        // Print non-redirected output to console
+        const consoleStream = isStderr ? process.stdout : process.stderr;
+        const consoleOutput = isStderr ? result.stdout : result.stderr;
+        if (consoleOutput) {
+            consoleStream.write(consoleOutput);
+        }
+    } catch (err) {
+        process.stderr.write(
+            `${commandParts[0]}: ${filename}: ${err.message}\n`
+        );
+    }
 }
-
+// ----- Command Handlers -----
+function handleEcho(answer) {
+    const parts = parseArgs(answer);
+    const output = parts.slice(1).join(" ");
+    // Use process.stdout instead of rl.write()
+    process.stdout.write(output + "\n");
+}
+function handleInvalid(answer) {
+    process.stdout.write(`${answer}: command not found\n`);
+}
 function handleExit() {
     rl.close();
 }
-
-function handleType(args) {
-    const command = args[1];
-    if (BUILTIN_COMMANDS.includes(command.toLowerCase())) {
+function handleType(answer) {
+    const parts = parseArgs(answer);
+    const command = parts[1];
+    const builtins = ["exit", "echo", "type", "pwd"];
+    if (builtins.includes(command.toLowerCase())) {
         process.stdout.write(`${command} is a shell builtin\n`);
     } else {
         const paths = process.env.PATH.split(":");
         for (const p of paths) {
             let destPath = path.join(p, command);
-            if (fs.existsSync(destPath)) {
+            if (fs.existsSync(destPath) && fs.statSync(destPath).isFile()) {
                 process.stdout.write(`${command} is ${destPath}\n`);
                 return;
             }
@@ -764,147 +237,109 @@ function handleType(args) {
         process.stdout.write(`${command}: not found\n`);
     }
 }
-
-function handlePWD() {
-    process.stdout.write(`${process.cwd()}\n`);
-}
-
-function handleChangeDirectory(args) {
-    const directory = args[1] || HOMEDIR;
-    try {
-        process.chdir(directory);
-    } catch (err) {
-        process.stdout.write(`cd: ${directory}: No such file or directory\n`);
+function handleFile(answer) {
+    // Use parseArgs to handle any quoting in the command name
+    const parts = parseArgs(answer);
+    const executable = parts[0]; // the command name (may be quoted)
+    const args = parts.slice(1);
+    const paths = process.env.PATH.split(":");
+    for (const pathEnv of paths) {
+        let destPath = path.join(pathEnv, executable);
+        if (fs.existsSync(destPath) && fs.statSync(destPath).isFile()) {
+            // Use argv0 option so that the child process sees the bare command name.
+            execFileSync(destPath, args, {
+                encoding: "utf-8",
+                stdio: "inherit",
+                argv0: executable,
+            });
+            return;
+        }
     }
+    //console.log(`${executable}: command not found`);
 }
-
-function handleReadFile(args) {
-    if (args.length < 2) {
+function handleReadFile(answer) {
+    const args = parseArgs(answer).slice(1); // Extract file paths (excluding "cat")
+    if (args.length === 0) {
         console.error("cat: missing file operand");
         return;
     }
-
-    for (const filePath of args.slice(1)) {
+    for (const filePath of args) {
         try {
             const data = fs.readFileSync(filePath, "utf-8");
             process.stdout.write(data);
         } catch (err) {
-            console.error(`cat: ${filePath}: ${err.code === "ENOENT" ? "No such file or directory" : "Permission denied"}`);
+            if (err.code === "ENOENT") {
+                console.error(`cat: ${filePath}: No such file or directory`);
+            } else {
+                console.error(`cat: ${filePath}: Permission denied`);
+            }
         }
     }
 }
-
-function handleFile(args) {
-    const executable = args[0];
-    const paths = process.env.PATH.split(":");
-    for (const pathEnv of paths) {
-        let destPath = path.join(pathEnv, executable);
-        if (fs.existsSync(destPath)) {
-            execFileSync(destPath, args.slice(1), {
-                encoding: "utf-8",
-                stdio: "pipe",
-                argv0: executable,
-            });
-            return;
-        }
-    }
-    process.stdout.write(`${executable}: command not found\n`);
+function handlePWD() {
+    process.stdout.write(`${process.cwd()}\n`);
 }
-}
-
-function handleFile(args) {
-    const executable = args[0];
-    const paths = process.env.PATH.split(":");
-    for (const pathEnv of paths) {
-        let destPath = path.join(pathEnv, executable);
-        if (fs.existsSync(destPath)) {
-            execFileSync(destPath, args.slice(1), {
-                encoding: "utf-8",
-                stdio: "pipe",
-                argv0: executable,
-            });
-            return;
-        }
-    }
-    process.stdout.write(`${executable}: command not found\n`);
-}
-
-function handleRedirect(args) {
-    const opIndex = args.findIndex((arg) => REDIRECT_OPERATORS.includes(arg));
-    if (opIndex === -1 || opIndex === args.length - 1) return;
-
-    const op = args[opIndex];
-    const filename = args[opIndex + 1];
-    const commandParts = args.slice(0, opIndex);
-
-    if (commandParts.length === 0) return;
-
-    const isAppend = op.endsWith(">>");
-    const isStderr = op.startsWith("2");
-    const flag = isAppend ? "a" : "w";
-
-    const result = spawnSync(commandParts[0], commandParts.slice(1), {
-        encoding: "utf-8",
-        stdio: ["inherit", "pipe", "pipe"],
-    });
-
+function handleChangeDirectory(answer) {
+    const parts = parseArgs(answer);
+    const directory = parts[1];
     try {
-        fs.mkdirSync(path.dirname(filename), { recursive: true });
-        const content = (isStderr ? result.stderr : result.stdout) || "";
-        fs.writeFileSync(filename, content, { flag, mode: 0o644 });
-
-        const consoleStream = isStderr ? process.stdout : process.stderr;
-        const consoleOutput = isStderr ? result.stdout : result.stderr;
-        if (consoleOutput) consoleStream.write(consoleOutput);
+        if (directory === "~") {
+            process.chdir(HOMEDIR);
+        } else {
+            process.chdir(directory);
+        }
+        rl.prompt();
     } catch (err) {
-        process.stderr.write(`${commandParts[0]}: ${filename}: ${err.message}\n`);
+        process.stdout.write(`cd: ${directory}: No such file or directory\n`);
     }
 }
-
-// Main Input Handler
+// Attach a one-time event listener (it remains active)
 function handleInput(line) {
-    const args = parseArgs(line);
-    if (args.length === 0) {
+    if (line.startsWith("invalid")) {
+        handleInvalid(line);
         rl.prompt();
         return;
     }
-
-    const cmd = args[0]?.toLowerCase();
-    const hasRedirect = args.some((arg) => REDIRECT_OPERATORS.includes(arg));
-
-    if (hasRedirect) {
-        handleRedirect(args);
+    const parts = parseArgs(line);
+    if (parts.length === 0) {
+        rl.prompt();
+        return;
+    }
+    const cmd = parts[0]?.toLowerCase();
+    const redirectOperators = ["2>>", "1>>", "2>", "1>", ">>", ">"];
+    const foundOperator = redirectOperators.find((op) => parts.includes(op));
+    if (foundOperator) {
+        handleRedirect(line);
     } else {
         switch (cmd) {
             case "exit":
                 handleExit();
                 break;
             case "echo":
-                handleEcho(args);
+                handleEcho(line);
                 break;
             case "type":
-                handleType(args);
+                handleType(line);
                 break;
             case "pwd":
                 handlePWD();
                 break;
             case "cd":
-                handleChangeDirectory(args);
+                handleChangeDirectory(line);
                 break;
             case "cat":
-                handleReadFile(args);
+                handleReadFile(line);
                 break;
             default:
-                handleFile(args);
+                handleFile(line);
         }
     }
-
     rl.prompt();
 }
-
-// Event Listeners
 rl.on("line", handleInput);
-rl.on("close", () => process.exit(0));
-
-// Start REPL
+// Optionally handle close event:
+rl.on("close", () => {
+    process.exit(0);
+});
+// ----- Main REPL Loop -----
 rl.prompt();
