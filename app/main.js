@@ -31,9 +31,10 @@ function completer(line) {
       const commonPrefix = findCommonPrefix(commands);
       if (commonPrefix.length > line.length) {
         return [[commonPrefix], line];
+      } else {
+        return [commands, line]; // Return matching commands and the current line
       }
     }
-    return [commands, line]; // Return matching commands and the current line
   }
   return [[], line]; // No matches
 }
