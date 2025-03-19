@@ -5,10 +5,35 @@ const fs = require("fs");
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
+  completer: completer, // Add autocomplete functionality
 });
 
 const PATH = process.env.PATH;
 let currentWorkingDir = process.cwd();
+
+// Autocomplete function
+function completer(line) {
+  const commands = getMatchingCommands(line);
+  return [commands, line]; // Return matching commands and the current line
+}
+
+// Get matching commands for autocomplete
+function getMatchingCommands(partialCommand) {
+  const paths = PATH.split(":");
+  const matches = new Set();
+
+  for (const path of paths) {
+    if (!fs.existsSync(path)) continue;
+    const files = fs.readdirSync(path);
+    for (const file of files) {
+      if (file.startsWith(partialCommand)) {
+        matches.add(file);
+      }
+    }
+  }
+
+  return Array.from(matches);
+}
 
 // Utility function to check if a command exists in PATH
 function checkIfCommandExistsInPath(command) {
