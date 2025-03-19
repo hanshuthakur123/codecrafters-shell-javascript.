@@ -21,37 +21,17 @@ function completer(line) {
     return [[commands[0] + " "], line];
   } else if (commands.length > 1) {
     if (tabPressCount === 1) {
-      // If <TAB> is pressed twice, display all matches
-      console.log(commands.join(" ")); // Print all matches
+      // If <TAB> is pressed twice, display all matches in a single line
+      const matchesString = commands.join(" "); // Join matches with spaces
+      console.log(matchesString); // Print the matches
       process.stdout.write('\x07'); // Ring the bell
       tabPressCount = 0; // Reset tab press count
-      return [[], line]; // Do not modify the command line
     } else {
-      // On the first <TAB> press, autocomplete to the common prefix
-      const commonPrefix = findCommonPrefix(commands);
-      if (commonPrefix && commonPrefix !== line) {
-        tabPressCount++; // Increment tab press count
-        return [[commonPrefix], commonPrefix]; // Autocomplete to the common prefix
-      } else {
-        tabPressCount++; // Increment tab press count
-        return [commands, line]; // Return all matches
-      }
+      tabPressCount++; // Increment tab press count
     }
+    return [commands, line]; // Return matching commands and the current line
   }
   return [[], line]; // No matches
-}
-
-// Helper function to find the common prefix among strings
-function findCommonPrefix(strings) {
-  if (strings.length === 0) return "";
-  let prefix = strings[0];
-  for (let i = 1; i < strings.length; i++) {
-    while (strings[i].indexOf(prefix) !== 0) {
-      prefix = prefix.slice(0, -1);
-      if (prefix === "") return "";
-    }
-  }
-  return prefix;
 }
 
 // Get matching commands for autocomplete
