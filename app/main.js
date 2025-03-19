@@ -68,7 +68,7 @@ function handleChangeDirectory(path) {
     return;
   }
 
-  let newPath = path.startsWith(".") ? currentWorkingDir : "";
+  let newPath = path.startsWith("/") ? "" : currentWorkingDir;
 
   const steps = path.replace(/\/$/, "").split("/");
   for (const step of steps) {
