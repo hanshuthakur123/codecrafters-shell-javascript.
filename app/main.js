@@ -182,7 +182,7 @@ function handleRedirect(answer) {
     // Execute command
     const result = spawnSync(commandParts[0], commandParts.slice(1), {
         encoding: "utf-8",
-        stdio: ["inherit", "pipe", "pipe"],
+        stdio: ["inherit", "pipe"],
     });
     try {
         // Always create directory structure
