@@ -21,7 +21,9 @@ function completer(line) {
     return [[commands[0] + " "], line];
   } else if (commands.length > 1) {
     if (tabPressCount === 1) {
-      // If <TAB> is pressed twice, ring the bell
+      // If <TAB> is pressed twice, display all matches in a single line
+      const matchesString = commands.join(" "); // Join matches with spaces
+      console.log(matchesString); // Print the matches
       process.stdout.write('\x07'); // Ring the bell
       tabPressCount = 0; // Reset tab press count
     } else {
