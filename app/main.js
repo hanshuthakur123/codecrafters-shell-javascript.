@@ -34,67 +34,68 @@ function longestCommonPrefix(strings) {
 }
 
 function completer(line) {
-    const paths = process.env.PATH.split(":");
-    const executables = new Set();
+  const paths = process.env.PATH.split(":");
+  const executables = new Set();
 
-    // Collect executable files from PATH directories
-    for (const dir of paths) {
-        try {
-            const files = fs.readdirSync(dir);
-            for (const file of files) {
-                const fullPath = path.join(dir, file);
-                try {
-                    fs.accessSync(fullPath, fs.constants.X_OK);
-                    const stats = fs.statSync(fullPath);
-                    if (stats.isFile()) {
-                        executables.add(file);
-                    }
-                } catch (e) {
-                    // Skip non-executable files
-                }
-            }
-        } catch (e) {
-            // Skip inaccessible directories
-        }
-    }
+  // Collect executable files from PATH directories
+  for (const dir of paths) {
+      try {
+          const files = fs.readdirSync(dir);
+          for (const file of files) {
+              const fullPath = path.join(dir, file);
+              try {
+                  fs.accessSync(fullPath, fs.constants.X_OK);
+                  const stats = fs.statSync(fullPath);
+                  if (stats.isFile()) {
+                      executables.add(file);
+                  }
+              } catch (e) {
+                  // Skip non-executable files
+              }
+          }
+      } catch (e) {
+          // Skip inaccessible directories
+      }
+  }
 
-    const allCommands = [...BUILTIN_COMMANDS, ...executables].sort();
-    const currentInput = line.trim();
-    const hits = allCommands.filter((cmd) => cmd.startsWith(currentInput)).sort();
+  const allCommands = [...BUILTIN_COMMANDS, ...executables].sort();
+  const currentInput = line.trim();
+  const hits = allCommands.filter((cmd) => cmd.startsWith(currentInput)).sort();
 
-    if (hits.length === 0) {
-        process.stdout.write("\x07");
-        return [[], line];
-    }
+  if (hits.length === 0) {
+      process.stdout.write("\x07"); // Ring the bell for no matches
+      return [[], line];
+  }
 
-    const lcp = longestCommonPrefix(hits);
-    if (lcp.length > currentInput.length) {
-        const hasLongerCommands = hits.some((cmd) => cmd.startsWith(lcp) && cmd.length > lcp.length);
-        if (hasLongerCommands) {
-            return [[lcp], line];
-        } else {
-            return [[lcp + " "], line];
-        }
-    } else {
-        if (hits.length === 1) {
-            return [[hits[0] + " "], line];
-        } else {
-            if (currentInput === lastTabInput && tabPressCount === 1) {
-                process.stdout.write("\n" + hits.join("  ") + "\n");
-                rl.prompt(true);
-                lastTabInput = "";
-                tabPressCount = 0;
-                return [[], line];
-            } else {
-                process.stdout.write("\x07");
-                lastTabInput = currentInput;
-                tabPressCount = 1;
-                return [[], line];
-            }
-        }
-    }
+  const lcp = longestCommonPrefix(hits);
+  if (lcp.length > currentInput.length) {
+      const hasLongerCommands = hits.some((cmd) => cmd.startsWith(lcp) && cmd.length > lcp.length);
+      if (hasLongerCommands) {
+          return [[lcp], line]; // Complete to the longest common prefix
+      } else {
+          return [[lcp + " "], line]; // Complete and add a space
+      }
+  } else {
+      if (hits.length === 1) {
+          return [[hits[0] + " "], line]; // Complete the single match
+      } else {
+          if (currentInput === lastTabInput && tabPressCount === 1) {
+              // Display the list of matches on the second TAB press
+              process.stdout.write("\n" + hits.join("  ") + "\n");
+              rl.prompt(true); // Reset the prompt
+              lastTabInput = "";
+              tabPressCount = 0;
+              return [[], line];
+          } else {
+              // Ring the bell on the first TAB press
+              process.stdout.write("\x07");
+              lastTabInput = currentInput;
+              tabPressCount = 1;
+              return [[], line];
+          }
+      }
+  }
 }
-
 function parseArgs(input) {
     let args = [];
     let current = [];
