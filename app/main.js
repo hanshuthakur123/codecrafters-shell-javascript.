@@ -72,7 +72,7 @@ function getCmdFullPath(cmd) {
       return `${fullPath}`;
     }
   }
-  return " ";
+  return "";
 }
 
 // Handle type command
