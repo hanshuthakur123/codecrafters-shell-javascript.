@@ -75,7 +75,7 @@ function completer(line) {
             // Handle multiple matches
             if (currentInput === lastTabInput && tabPressCount === 1) {
                 // Show matches
-                process.stdout.write("\n" + hits.join("  ") + "\n");
+                process.stdout.write("\n" + hits.join("") + "\n");
                 rl.prompt(true);
                 lastTabInput = "";
                 tabPressCount = 0;
