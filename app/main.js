@@ -58,7 +58,7 @@ function getEchoCmd(args, command) {
   let part = command.split("'");
   let n = part.length;
   if (n >= 3 && part[0].trim() === "echo" && part[n - 1].trim() === "") {
-    return part.slice(1, n - 1).join(" ");
+    return part.slice(1, n - 1).join("");
   }
   return args.join(" ");
 }
@@ -72,7 +72,7 @@ function getCmdFullPath(cmd) {
       return `${fullPath}`;
     }
   }
-  return "";
+  return " ";
 }
 
 // Handle type command
