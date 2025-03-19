@@ -242,7 +242,7 @@ function handleFile(answer) {
             });
 
             if (result.error) {
-                process.stderr.write(`${executable}: ${result.error.message}\n`);
+                process.stderr.write(`${executable}`);
                 return;
             }
 
