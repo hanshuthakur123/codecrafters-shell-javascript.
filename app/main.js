@@ -14,6 +14,10 @@ let currentWorkingDir = process.cwd();
 // Autocomplete function
 function completer(line) {
   const commands = getMatchingCommands(line);
+  if (commands.length === 1) {
+    // If there's only one match, append a space after the autocompleted command
+    return [[commands[0] + " "], line];
+  }
   return [commands, line]; // Return matching commands and the current line
 }
 
