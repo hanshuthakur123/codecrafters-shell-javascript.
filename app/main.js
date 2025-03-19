@@ -1,131 +1,93 @@
-const execSync = require("child_process").execSync;
 const readline = require("readline");
-const fs = require('node:fs');
+const path = require("path");
+const fs = require("fs");
+const { execSync } = require('child_process');
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
-const PATH = process.env.PATH;
-const splitCurrDir = __dirname.split("/");
-let currWorkDir = `/${splitCurrDir[splitCurrDir.length - 1]}`;
-function checkIfCommandExistsInPath(builtin) {
-  const paths = PATH.split(":");
-  for (let path of paths) {
-    if (!fs.existsSync(path)) {
-      continue;
+const CMDS = ["type", "echo", "exit", "pwd", "cd"]
+prepareShell();
+rl.on("line", (answer) => {
+  answer = answer.trim();
+  executeCommand(answer);
+  prepareShell();
+});
+function executeCommand(command) {
+  const {cmd, args} = getCmd(command);
+  
+  if (command === "exit 0"){
+    process.exit(0);
+  }
+  
+  let res = `${command}: command not found`;
+  if (cmd === "echo") {
+    res = getEchoCmd(args, command);
+  } else if (cmd === "type") {
+    res = getTypeCmd(args[0]);
+  } else if (cmd === "pwd") {
+    res = process.cwd() 
+  } else if (cmd === "cd") {
+    res = execCd(args)
+    if (res === undefined) {
+      return;      
     }
-    const fileNames = fs.readdirSync(path);
-    if (fileNames.includes(builtin)) {
-      console.log(`${builtin} is ${path}/${builtin}`);
-      return true;
-    }
-  }
-  return false;
-}
-function handleEcho(text) {
-  if (text.startsWith("'") && text.endsWith("'")) {
-    const formattedString = text.slice(1, text.length - 1);
-    console.log(formattedString.replaceAll("'", ""));
-    return;
-  }
-  const formattedString = text.split(" ").filter(t => t !== "").join(" ");
-  console.log(formattedString);
-}
-function handleChangeDirectory(answer) {
-  let path = answer.split(" ")[1];
-  if (path === "~") {
-    currWorkDir = process.env.HOME;
-    return;
-  }
-  let newWorkDir = "";
-  if (!path.startsWith(".")) {
-    path = path.slice(1);
   } else {
-    newWorkDir = currWorkDir;
+    res = execExternalProgram(cmd, command)
   }
-  if (path.endsWith("/")) {
-    path = path.slice(0, path.length - 1);
-  }
-  const steps = path.split("/");
-  for (let step of steps) {
-    switch (step) {
-      case ".":
-        break;
-      case "..":
-        const splitNewWorkDir = newWorkDir.split("/");
-        newWorkDir = splitNewWorkDir.slice(0, splitNewWorkDir.length - 1).join("/");
-        break;
-      default:
-        newWorkDir += `/${step}`;
-    }
-    if (!fs.existsSync(newWorkDir)) {
-      console.log(`cd: ${answer.split(" ")[1]}: No such file or directory`);
-      return;
-    }
-  }
-  currWorkDir = newWorkDir;
+  
+  console.log(res);
+};
+function prepareShell() {
+  process.stdout.write("$ ");
+};
+function getCmd(answer) {
+  let args = answer.split(/\s+/);
+  cmd = args[0];
+  args.shift();
+  return {cmd, args};
 }
-function handledExternalProgram(answer) {
-  const paths = PATH.split(":");
-  let foundPath = "";
-  const program = answer.split(" ")[0];
-  for (let path of paths) {
-    if (!fs.existsSync(path)) {
-      continue;
-    }
-    const fileNames = fs.readdirSync(path);
-    if (fileNames.includes(program)) {
-      foundPath = path;
-      break;
-    }
+function getEchoCmd(args, command) {
+  let part = command.split("'");
+  let n = part.length;
+  if (n >= 3 && part[0].trim() === "echo" && part[n-1].trim() === "") {
+    return  part.slice(1, n-1).join("");
   }
-  if (foundPath !== "") {
-    const output = execSync(answer);
-    const outputString = output.toString();
-    console.log(outputString.slice(0, output.length - 1))
-    return true;
-  }
-  return false;
+  return args.join(" ");
 }
-function handleAnswer(answer) {
-  if (answer === "exit 0") {
-    rl.close();
-    return;
-  }
-  if (answer.startsWith("echo ")) {
-    const text = answer.replace("echo ", "");
-    handleEcho(text);
-  } else if (answer.startsWith("type ")) {
-    const builtin = answer.replace("type ", "");
-    let found = false;
-    switch (builtin) {
-      case "echo":
-      case "type":
-      case "exit":
-      case "pwd":
-      case "cd":
-        console.log(`${builtin} is a shell builtin`)
-        found = true;
-        break;
-      default:
-        found = checkIfCommandExistsInPath(builtin);
-        break;
+function getCmdFullPath(cmd) {
+  const paths = process.env.PATH.split(path.delimiter);
+  for (let p of paths) {
+    const fullPath = path.join(p, cmd);
+    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+      return `${fullPath}`;
     }
-    if (!found) {
-      console.log(`${builtin}: not found`);
-    }
-  } else if (answer === "pwd") {
-    console.log(currWorkDir);
-  } else if (answer.startsWith("cd ")) {
-    handleChangeDirectory(answer);
-  } else if (!handledExternalProgram(answer)) {
-    console.log(`${answer}: command not found`);
   }
-  repeat();
+  return "";
 }
-function repeat() {
-  rl.question("$ ", (answer) => {
-    handleAnswer(answer);
-  });
+function getTypeCmd(cmdName) {
+  cmdFullPath = getCmdFullPath(cmdName);
+  if(CMDS.includes(cmdName)) {
+    return `${cmdName} is a shell builtin`;
+  } else if (cmdFullPath !== "") {
+    return `${cmdName} is ${cmdFullPath}`;
+  }
+  return `${cmdName}: not found`;
 }
-repeat();
+function execExternalProgram(cmd, command) {
+    cmdFullPath = getCmdFullPath(cmd);
+    if (cmdFullPath === "") {
+      return `${command}: command not found`
+    }
+    return execSync(command).toString().trim();
+}
+function execCd(args) {
+  const path = args[0]
+  if (path === "~") {
+    process.chdir(process.env.HOME);
+  } else if (args.length > 1 || fs.existsSync(path) === false) {
+    return `cd: ${path}: No such file or directory`
+  } else {
+    process.chdir(path)
+  }
+}
