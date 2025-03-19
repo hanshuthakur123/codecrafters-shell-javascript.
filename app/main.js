@@ -251,7 +251,7 @@ function handleFile(answer) {
             // Use argv0 option so that the child process sees the bare command name.
             execFileSync(destPath, args, {
                 encoding: "utf-8",
-                stdio: "inherit",
+                stdio: "pipe",
                 argv0: executable,
             });
             return;
