@@ -10,7 +10,7 @@ const rl = readline.createInterface({
     completer: completer,
     prompt: "$ ",
 });
-let lastTabInput = "";
+let lastTabInput = "''";
 let tabPressCount = 0;
 function longestCommonPrefix(strings) {
     if (strings.length === 0) return "";
@@ -75,7 +75,7 @@ function completer(line) {
             // Handle multiple matches
             if (currentInput === lastTabInput && tabPressCount === 1) {
                 // Show matches
-                process.stdout.write("\n" + hits.join("") + "\n");
+                process.stdout.write("\n" + hits.join("  ") + "\n");
                 rl.prompt(true);
                 lastTabInput = "";
                 tabPressCount = 0;
