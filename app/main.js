@@ -18,7 +18,7 @@ function completer(line) {
   if (commands.length === 1) {
     // If there's only one match, append a space after the autocompleted command
     tabPressCount = 0; // Reset tab press count
-    return [[commands[0] + " "], line];
+    return [[commands[0]], line];
   } else if (commands.length > 1) {
     if (tabPressCount === 1) {
       // If <TAB> is pressed twice, display all matches in a single line
@@ -28,6 +28,10 @@ function completer(line) {
       tabPressCount = 0; // Reset tab press count
     } else {
       tabPressCount++; // Increment tab press count
+      const commonPrefix = findCommonPrefix(commands);
+      if (commonPrefix.length > line.length) {
+        return [[commonPrefix], line];
+      }
     }
     return [commands, line]; // Return matching commands and the current line
   }
@@ -122,16 +126,17 @@ function handleExternalProgram(command) {
 }
 
 function findCommonPrefix(strings) {
-    if (strings.length === 0) return "";
-    let prefix = strings[0];
-    for (let i = 1; i < strings.length; i++) {
-      while (strings[i].indexOf(prefix) !== 0) {
-        prefix = prefix.slice(0, -1);
-        if (prefix === "") return "";
-      }
+  if (strings.length === 0) return "";
+  let prefix = strings[0];
+  for (let i = 1; i < strings.length; i++) {
+    while (strings[i].indexOf(prefix) !== 0) {
+      prefix = prefix.slice(0, -1);
+      if (prefix === "") return "";
     }
-    return prefix;
   }
+  return prefix;
+}
+
 // Handle user input
 function handleAnswer(answer) {
   if (answer === "exit 0") {
