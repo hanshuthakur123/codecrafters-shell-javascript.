@@ -165,7 +165,7 @@ function handleType(args) {
         const paths = process.env.PATH.split(":");
         for (const p of paths) {
             let destPath = path.join(p, command);
-            if (fs.existsSync(destPath) {
+            if (fs.existsSync(destPath)) {
                 process.stdout.write(`${command} is ${destPath}\n`);
                 return;
             }
