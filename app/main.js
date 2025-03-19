@@ -144,7 +144,12 @@ function completer(line) {
 
   const lcp = longestCommonPrefix(hits);
   if (lcp.length > currentInput.length) {
-    return [[lcp], line]; // Complete to the longest common prefix
+    // If there is a unique match, append a space
+    if (hits.length === 1) {
+      return [[hits[0] + " "], line];
+    } else {
+      return [[lcp], line]; // Complete to the longest common prefix
+    }
   } else {
     return [hits, line]; // Return all matches
   }
