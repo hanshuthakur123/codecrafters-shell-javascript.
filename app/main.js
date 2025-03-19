@@ -10,15 +10,26 @@ const rl = readline.createInterface({
 
 const PATH = process.env.PATH;
 let currentWorkingDir = process.cwd();
+let tabPressCount = 0; // Track the number of times <TAB> is pressed
 
 // Autocomplete function
 function completer(line) {
   const commands = getMatchingCommands(line);
   if (commands.length === 1) {
     // If there's only one match, append a space after the autocompleted command
+    tabPressCount = 0; // Reset tab press count
     return [[commands[0] + " "], line];
+  } else if (commands.length > 1) {
+    if (tabPressCount === 1) {
+      // If <TAB> is pressed twice, ring the bell
+      process.stdout.write('\x07'); // Ring the bell
+      tabPressCount = 0; // Reset tab press count
+    } else {
+      tabPressCount++; // Increment tab press count
+    }
+    return [commands, line]; // Return matching commands and the current line
   }
-  return [commands, line]; // Return matching commands and the current line
+  return [[], line]; // No matches
 }
 
 // Get matching commands for autocomplete
