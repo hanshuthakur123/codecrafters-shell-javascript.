@@ -92,7 +92,7 @@ function handleExternalProgram(command) {
     if (!fs.existsSync(path)) continue;
     const files = fs.readdirSync(path);
     if (files.includes(program)) {
-      const output = execSync(command).toString();
+      const output = execSync(command).toString().trim();
       console.log(output);
       return true;
     }
