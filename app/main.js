@@ -52,16 +52,63 @@ const autocompleteExec = (cmd) => {
 };
 
 const getInput = () => {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
+  let input = '';
+  let pos = 0;
+  let tabCount = 0;
 
-    rl.question('$ ', (input) => {
-      rl.close();
+  const clearLine = () => {
+    process.stdout.write('\x1b[2K'); // Clear the entire line
+    process.stdout.write('\r');      // Move cursor to the beginning of the line
+  };
+
+  const displayPrompt = () => {
+    process.stdout.write(`$ ${input}`);
+  };
+
+  process.stdin.setRawMode(true);
+  process.stdin.resume();
+  process.stdin.setEncoding('utf8');
+
+  process.stdin.on('data', (key) => {
+    if (key === '\r' || key === '\n') { // Enter key
+      process.stdout.write('\n');
+      process.stdin.pause();
       resolve(input);
-    });
+    } else if (key === '\t') { // Tab key
+      const matches = autocompleteExec(input);
+      if (matches && matches.length > 0) {
+        if (matches.length > 1) {
+          if (tabCount === 0) {
+            process.stdout.write('\a'); // Ring the bell
+            tabCount++;
+          } else {
+            clearLine();
+            console.log(matches.join('  ')); // Display all matches
+            tabCount = 0;
+          }
+        } else if (matches.length === 1) {
+          input = matches[0] + ' ';
+          pos = input.length;
+          tabCount = 0;
+        }
+        clearLine();
+        displayPrompt();
+      } else {
+        process.stdout.write('\a'); // Ring the bell if no matches
+      }
+    } else if (key === '\x7f' || key === '\b') { // Backspace
+      if (pos > 0) {
+        input = input.slice(0, pos - 1) + input.slice(pos);
+        pos--;
+        clearLine();
+        displayPrompt();
+      }
+    } else if (key.length === 1 && pos < 100) { // Normal character input
+      input = input.slice(0, pos) + key + input.slice(pos);
+      pos++;
+      clearLine();
+      displayPrompt();
+    }
   });
 };
 
