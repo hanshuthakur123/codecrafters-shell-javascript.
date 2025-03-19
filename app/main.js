@@ -14,44 +14,32 @@ let tabPressCount = 0; // Track the number of times <TAB> is pressed
 
 // Autocomplete function
 function completer(line) {
-  const commands = getMatchingCommands(line);
-  if (commands.length === 1) {
-    // If there's only one match, append a space after the autocompleted command
-    tabPressCount = 0; // Reset tab press count
-    return [[commands[0] + " "], line];
-  } else if (commands.length > 1) {
-    if (tabPressCount === 1) {
-      // If <TAB> is pressed twice, display all matches in a single line
-      const matchesString = commands.join(" "); // Join matches with spaces
-      console.log(matchesString); // Print the matches
-      process.stdout.write('\x07'); // Ring the bell
+    const commands = getMatchingCommands(line);
+    if (commands.length === 1) {
+      // If there's only one match, append a space after the autocompleted command
       tabPressCount = 0; // Reset tab press count
-    } else {
-      tabPressCount++; // Increment tab press count
-    }
-    return [commands, line]; // Return matching commands and the current line
-  }
-  return [[], line]; // No matches
-}
-
-// Get matching commands for autocomplete
-function getMatchingCommands(partialCommand) {
-  const paths = PATH.split(":");
-  const matches = new Set();
-
-  for (const path of paths) {
-    if (!fs.existsSync(path)) continue;
-    const files = fs.readdirSync(path);
-    for (const file of files) {
-      if (file.startsWith(partialCommand)) {
-        matches.add(file);
+      return [[commands[0] + " "], line];
+    } else if (commands.length > 1) {
+      if (tabPressCount === 1) {
+        // If <TAB> is pressed twice, display all matches
+        console.log(commands.join(" ")); // Print all matches
+        process.stdout.write('\x07'); // Ring the bell
+        tabPressCount = 0; // Reset tab press count
+        return [[], line]; // Do not modify the command line
+      } else {
+        // On the first <TAB> press, autocomplete to the common prefix
+        const commonPrefix = findCommonPrefix(commands);
+        if (commonPrefix && commonPrefix !== line) {
+          tabPressCount++; // Increment tab press count
+          return [[commonPrefix], commonPrefix]; // Autocomplete to the common prefix
+        } else {
+          tabPressCount++; // Increment tab press count
+          return [commands, line]; // Return all matches
+        }
       }
     }
+    return [[], line]; // No matches
   }
-
-  return Array.from(matches);
-}
-
 // Utility function to check if a command exists in PATH
 function checkIfCommandExistsInPath(command) {
   const paths = PATH.split(":");
@@ -117,6 +105,17 @@ function handleExternalProgram(command) {
   return false;
 }
 
+function findCommonPrefix(strings) {
+    if (strings.length === 0) return "";
+    let prefix = strings[0];
+    for (let i = 1; i < strings.length; i++) {
+      while (strings[i].indexOf(prefix) !== 0) {
+        prefix = prefix.slice(0, -1);
+        if (prefix === "") return "";
+      }
+    }
+    return prefix;
+  }
 // Handle user input
 function handleAnswer(answer) {
   if (answer === "exit 0") {
