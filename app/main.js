@@ -20,12 +20,7 @@ function completer(line) {
     tabPressCount = 0; // Reset tab press count
     return [[commands[0] + " "], line];
   } else if (commands.length > 1) {
-    const longestPrefix = findLongestCommonPrefix(commands);
-    if (longestPrefix.length > line.length) {
-      // Autocomplete to the longest common prefix
-      tabPressCount = 0; // Reset tab press count
-      return [[longestPrefix], line];
-    } else if (tabPressCount === 1) {
+    if (tabPressCount === 1) {
       // If <TAB> is pressed twice, display all matches in a single line
       const matchesString = commands.join(" "); // Join matches with spaces
       console.log(matchesString); // Print the matches
@@ -37,19 +32,6 @@ function completer(line) {
     return [commands, line]; // Return matching commands and the current line
   }
   return [[], line]; // No matches
-}
-
-// Find the longest common prefix among an array of strings
-function findLongestCommonPrefix(strings) {
-  if (strings.length === 0) return "";
-  let prefix = strings[0];
-  for (let i = 1; i < strings.length; i++) {
-    while (strings[i].indexOf(prefix) !== 0) {
-      prefix = prefix.slice(0, -1);
-      if (prefix === "") return "";
-    }
-  }
-  return prefix;
 }
 
 // Get matching commands for autocomplete
