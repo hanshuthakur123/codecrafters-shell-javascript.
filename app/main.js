@@ -156,7 +156,7 @@ function completer(line) {
 
   // If there are multiple matches, ring the bell and return the list of matches
   process.stdout.write('\x07'); // Ring the bell
-  return [hits[0], line]; // Join multiple completions with space
+  return [hits, line]; // Join multiple completions with space
 }
 
 
