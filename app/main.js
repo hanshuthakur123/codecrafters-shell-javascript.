@@ -146,12 +146,12 @@ function completer(line) {
 
   if (hits.length === 1  && hits===line) {
     // If there's only one match, append a space after the autocompleted command
-    return [[hits[0] + '  '], line];
+    return [[hits[0] ], line];
   }
 
-  if (hits.length === 1) {
+  if (hits.length === 1  && hits!==line) {
     // If there's only one match, append a space after the autocompleted command
-    return [[hits[0] ], line];
+    return [[hits[0] + ' '], line];
   }
   // If there are multiple matches, ring the bell and return the list of matches
   process.stdout.write('\x07'); // Ring the bell
