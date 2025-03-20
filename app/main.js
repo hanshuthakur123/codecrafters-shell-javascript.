@@ -138,7 +138,7 @@ function repeat() {
 function completer(line) {
   const completions = getMatchingCommands(line);
   const hits = completions.filter((c) => c.startsWith(line));
-  if (hits.length === 1) {
+  if (hits.length >= 1) {
     // If there's only one match, append a space after the autocompleted command
     return [[hits[0] + ' '], line];
   }
