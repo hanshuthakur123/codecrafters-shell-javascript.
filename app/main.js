@@ -139,10 +139,10 @@ function completer(line) {
   const completions = getMatchingCommands(line);
   const hits = completions.filter((c) => c.startsWith(line));
 
-  if (hits.length === 0) {
-    // No matches, return nothing
-    return [[ ], line];
-  }
+  // if (hits.length === 0) {
+  //   // No matches, return nothing
+  //   return [[ ], line];
+  // }
 
   if (hits.length === 1) {
     // If there's only one match, append a space after the autocompleted command
