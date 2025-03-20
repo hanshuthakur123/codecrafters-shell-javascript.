@@ -141,7 +141,7 @@ function completer(line) {
 
   if (hits.length === 0) {
     // No matches, return nothing
-    return [ line];
+    return [ hits];
   }
 
   if (hits.length === 1) {
