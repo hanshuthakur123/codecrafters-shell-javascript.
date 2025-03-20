@@ -150,7 +150,7 @@ function completer(line) {
 
   if (hits.length === 1 && hits[0] !== line) {
     // If there's only one match but it's not an exact match, append a space
-    return [[hits[0]+' '] , line];
+    return [[hits[0]] +' ', line];
   }
 
   // Handle multiple completions: check if the partial input is common to all matches
