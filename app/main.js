@@ -141,22 +141,24 @@ function completer(line) {
 
   if (hits.length === 0) {
     // No matches, return nothing
-    return [ hits];
+    return [hits];
   }
 
-  if (hits.length === 1  && hits===line) {
+  if (hits.length === 1 && hits[0] === line) {
     // If there's only one match, append a space after the autocompleted command
-    return [[hits[0] ], line];
+    return [[hits[0]], line];
   }
 
-  if (hits.length === 1  && hits!==line) {
-    // If there's only one match, append a space after the autocompleted command
+  if (hits.length === 1 && hits[0] !== line) {
+    // If there's only one match but it's not exactly the same as the line, append a space
     return [[hits[0] + ' '], line];
   }
+
   // If there are multiple matches, ring the bell and return the list of matches
   process.stdout.write('\x07'); // Ring the bell
-  return [hits, line]; // Do not append a space for multiple completions
+  return [[hits.join(' ')], line]; // Join multiple completions with space
 }
+
 
 function getMatchingCommands(line) {
   const paths = PATH.split(":");
