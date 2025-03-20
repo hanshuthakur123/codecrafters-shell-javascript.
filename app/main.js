@@ -151,7 +151,7 @@ function completer(line) {
 
   // If there are multiple matches, ring the bell and return the list of matches
   process.stdout.write(''); // Ring the bell
-  return [hits, line];
+  return [hits.length ? hits : completions, line];
 }
 
 function getMatchingCommands(line) {
