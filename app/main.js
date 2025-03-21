@@ -27,12 +27,27 @@ function checkIfCommandExistsInPath(builtin) {
 }
 
 function handleEcho(text) {
-  if (text.startsWith("'") && text.endsWith("'")) {
-    // Extract the text within single quotes
-    const formattedString = text.slice(1, text.length - 1);
-    console.log(formattedString);
+  // Handle single-quoted strings
+  if (text.includes("'")) {
+    // Split the text into parts based on single quotes
+    const parts = text.split("'");
+    let result = "";
+
+    // Iterate through the parts and concatenate them
+    for (let i = 0; i < parts.length; i++) {
+      // Odd indices are inside single quotes
+      if (i % 2 === 1) {
+        result += parts[i];
+      } else {
+        // Even indices are outside single quotes (handle spaces)
+        result += parts[i].trim();
+      }
+    }
+
+    console.log(result);
     return;
   }
+
   // Handle unquoted or double-quoted text
   const formattedString = text.split(" ").filter(t => t !== "").join(" ");
   console.log(formattedString);
