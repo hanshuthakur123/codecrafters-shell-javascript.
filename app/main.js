@@ -23,7 +23,7 @@ function completer(line) {
       // First tab press: ring the bell and do not autocomplete
       process.stdout.write('\x07'); // Ring the bell
       isFirstTabPress = false;
-      return [[], line];
+      return [hits[0], line];
     } else {
       // Second tab press: list all completions
       isFirstTabPress = true; // Reset state
