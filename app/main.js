@@ -18,7 +18,8 @@ function completer(line) {
   if (hits.length === 1) {
     // If there's only one match, append a space to the completed command
     return [[hits[0] + ' '], line];
-  }else if(isFirstTabPress) {
+  }
+   if (isFirstTabPress) {
       // First tab press: ring the bell and do not autocomplete
       process.stdout.write('\x07'); // Ring the bell
       isFirstTabPress = false;
@@ -26,9 +27,8 @@ function completer(line) {
     } else {
       // Second tab press: list all completions
       isFirstTabPress = true; // Reset state
-      return [hits, line];
-    }
-  return [hits.length ? hits : [], line+''];
+      return [hits.length ? hits : [], line+''];    }
+
 }
 
 // Get all commands in PATH
