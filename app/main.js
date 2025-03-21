@@ -37,7 +37,7 @@ function completer(line) {
       isFirstTabPress = true; // Reset state
       process.stdout.write(hits.join("  ") + "\n"); // Print completions on a single line
       rl.prompt(true); // Re-display the prompt
-      return [[], line];
+      return [hits, line];
     }
   }
 }
