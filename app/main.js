@@ -158,7 +158,7 @@ function completer(line) {
   if (commonPrefix !== line) {
     // If the common prefix is different from the input, it means we have multiple completions
     process.stdout.write('\x07'); // Ring the bell
-    return [hits, line]; // Return all matches separated by space
+    return [hits+' ', line]; // Return all matches separated by space
   }
 
   // Otherwise, return the common prefix (the shortest completion)
