@@ -1,116 +1,131 @@
+const execSync = require("child_process").execSync;
 const readline = require("readline");
-const fs = require("fs");
-const path = require("path");
-const { spawn, execFileSync } = require("child_process");
-const os = require("os");
+const fs = require('node:fs');
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
-  prompt: "$ "
 });
-const CMDS = ["type", "echo", "exit", "pwd"];
-rl.prompt();
-rl.on("line", (input) => {
-  input = input.trim();
-  execCmd(input, () => {
-    rl.prompt();
-  });
-})
-function execCmd(command, callback) {
-  const { cmd, args } = getCmd(command)
-  if (cmd === "exit" && args[0] === "0") {
-    process.exit(0);
-  } else if (cmd === "echo") {
-    console.log(args.join(" "));
-    callback();
-  } else if (cmd === "type") {
-    printType(args[0]);
-    callback();
-  } else if (cmd === "pwd") {
-    console.log(process.cwd());
-    callback();
-  } else if (cmd === "cd") {
-    let targetPath;
-    if (args.length === 0 || args[0] === "~") {
-      targetPath = os.homedir();
-    } else {
-      targetPath = path.resolve(args[0]);
+const PATH = process.env.PATH;
+const splitCurrDir = __dirname.split("/");
+let currWorkDir = `/${splitCurrDir[splitCurrDir.length - 1]}`;
+function checkIfCommandExistsInPath(builtin) {
+  const paths = PATH.split(":");
+  for (let path of paths) {
+    if (!fs.existsSync(path)) {
+      continue;
     }
-    if (fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory()) {
-      process.chdir(targetPath);
-    } else {
-      console.log(`cd: ${args[0]}: No such file or directory`);
+    const fileNames = fs.readdirSync(path);
+    if (fileNames.includes(builtin)) {
+      console.log(`${builtin} is ${path}/${builtin}`);
+      return true;
     }
-    callback();
+  }
+  return false;
+}
+function handleEcho(text) {
+  if (text.startsWith("'") && text.endsWith("'")) {
+    const formattedString = text.slice(1, text.length - 1);
+    console.log(formattedString.replaceAll("'", ""));
+    return;
+  }
+  const formattedString = text.split(" ").filter(t => t !== "").join(" ");
+  console.log(formattedString);
+}
+function handleChangeDirectory(answer) {
+  let path = answer.split(" ")[1];
+  if (path === "~") {
+    currWorkDir = process.env.HOME;
+    return;
+  }
+  let newWorkDir = "";
+  if (!path.startsWith(".")) {
+    path = path.slice(1);
   } else {
-    const paths = process.env.PATH.split(path.delimiter);
+    newWorkDir = currWorkDir;
+  }
+  if (path.endsWith("/")) {
+    path = path.slice(0, path.length - 1);
+  }
+  const steps = path.split("/");
+  for (let step of steps) {
+    switch (step) {
+      case ".":
+        break;
+      case "..":
+        const splitNewWorkDir = newWorkDir.split("/");
+        newWorkDir = splitNewWorkDir.slice(0, splitNewWorkDir.length - 1).join("/");
+        break;
+      default:
+        newWorkDir += `/${step}`;
+    }
+    if (!fs.existsSync(newWorkDir)) {
+      console.log(`cd: ${answer.split(" ")[1]}: No such file or directory`);
+      return;
+    }
+  }
+  currWorkDir = newWorkDir;
+}
+function handledExternalProgram(answer) {
+  const paths = PATH.split(":");
+  let foundPath = "";
+  const program = answer.split(" ")[0];
+  for (let path of paths) {
+    if (!fs.existsSync(path)) {
+      continue;
+    }
+    const fileNames = fs.readdirSync(path);
+    if (fileNames.includes(program)) {
+      foundPath = path;
+      break;
+    }
+  }
+  if (foundPath !== "") {
+    const output = execSync(answer);
+    const outputString = output.toString();
+    console.log(outputString.slice(0, output.length - 1))
+    return true;
+  }
+  return false;
+}
+function handleAnswer(answer) {
+  if (answer === "exit 0") {
+    rl.close();
+    return;
+  }
+  if (answer.startsWith("echo ")) {
+    const text = answer.replace("echo ", "");
+    handleEcho(text);
+  } else if (answer.startsWith("type ")) {
+    const builtin = answer.replace("type ", "");
     let found = false;
-    for (let p of paths) {
-      const fullPath = path.join(p, cmd);
-      const programFile = cmd;
-      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
-        found = true;
-        if (cmd.includes('/')) {
-          execFileSync(fullPath, args, { stdio: "inherit" });
-        } else {
-          // For simple commands, use just the program name
-          execFileSync(cmd, args, { stdio: "inherit" });
-        }
-        callback();
-      }
-    }
-    if (!found) {
-      console.log(`${command}: command not found`);
-      callback();
-    }
-  }
-}
-function getCmd(answer) {
-  let args = [];
-  let currentArg = '';
-  let inSingleQuotes = false;
-  let inDoubleQuotes = false;
-  for (let i = 0; i < answer.length; i++) {
-    const char = answer[i];
-    
-    if (char === '"' && !inSingleQuotes) {
-      inDoubleQuotes = !inDoubleQuotes;
-    } else if (char === "'" && !inDoubleQuotes) {
-      inSingleQuotes = !inSingleQuotes;
-    } else if (char === ' ' && !inSingleQuotes && !inDoubleQuotes) {
-      if (currentArg.length > 0) {
-        args.push(currentArg);
-        currentArg = '';
-      }
-    } else {
-      currentArg += char;
-    }
-  }
-  
-  if (currentArg.length > 0) {
-    args.push(currentArg);
-  }
-  let cmd = args[0];
-  args.shift();
-  return { cmd, args };
-}
-function printType(cmdName) {
-  let found = false;
-  if (CMDS.includes(cmdName)) {
-    console.log(`${cmdName} is a shell builtin`);
-    found = true;
-  } else {
-    const paths = process.env.PATH.split(path.delimiter);
-    for (let p of paths) {
-      const fullPath = path.join(p, cmdName);
-      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
-        console.log(`${cmdName} is ${fullPath}`);
+    switch (builtin) {
+      case "echo":
+      case "type":
+      case "exit":
+      case "pwd":
+      case "cd":
+        console.log(`${builtin} is a shell builtin`)
         found = true;
         break;
-      }
+      default:
+        found = checkIfCommandExistsInPath(builtin);
+        break;
     }
+    if (!found) {
+      console.log(`${builtin}: not found`);
+    }
+  } else if (answer === "pwd") {
+    console.log(currWorkDir);
+  } else if (answer.startsWith("cd ")) {
+    handleChangeDirectory(answer);
+  } else if (!handledExternalProgram(answer)) {
+    console.log(`${answer}: command not found`);
   }
-  if (!found) {
-    console.log(`${cmdName}: not found`);
-  }
+  repeat();
 }
+function repeat() {
+  rl.question("$ ", (answer) => {
+    handleAnswer(answer);
+  });
+}
+repeat();
