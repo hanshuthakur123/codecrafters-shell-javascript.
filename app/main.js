@@ -5,59 +5,59 @@ const fs = require('node:fs');
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
-  completer: completer // Add a completer function
 });
 
 const PATH = process.env.PATH;
 const splitCurrDir = __dirname.split("/");
 let currWorkDir = `/${splitCurrDir[splitCurrDir.length - 1]}`;
-let isFirstTabPress = true;
 
-// Autocompletion function
-function completer(line) {
-  const commands = getCommandsInPath();
-  const hits = commands.filter(c => c.startsWith(line));
-
-  if (hits.length === 0) {
-    // No matches, do nothing
-    return [[], line];
-  } else if (hits.length === 1) {
-    // Single match, autocomplete and append a space
-    isFirstTabPress = true; // Reset state
-    return [[hits[0] + " "], line];
-  } else {
-    // Multiple matches
-    if (isFirstTabPress) {
-      // First tab press: ring the bell and do not autocomplete
-      process.stdout.write('\x07'); // Ring the bell
-      isFirstTabPress = false;
-      return [[], line];
-    } else {
-      // Second tab press: list all completions on a single line
-      isFirstTabPress = true; // Reset state
-      process.stdout.write(hits.join("  ") + "\n"); // Print completions on a single line
-      rl.prompt(true); // Re-display the prompt
-      return [[], line];
+// Function to find matching executables in PATH
+function findMatchingExecutables(partialCommand) {
+  const paths = PATH.split(":");
+  const matches = [];
+  for (let path of paths) {
+    if (!fs.existsSync(path)) {
+      continue;
+    }
+    const fileNames = fs.readdirSync(path);
+    for (let fileName of fileNames) {
+      if (fileName.startsWith(partialCommand)) {
+        matches.push(fileName);
+      }
     }
   }
+  return matches;
 }
 
-// Get all commands in PATH
-function getCommandsInPath() {
-  const paths = PATH.split(":");
-  let commands = [];
-  for (let path of paths) {
-    if (!fs.existsSync(path)) continue;
-    const fileNames = fs.readdirSync(path);
-    commands = commands.concat(fileNames);
+// Function to handle autocompletion
+function handleAutocomplete(line) {
+  const matches = findMatchingExecutables(line);
+  if (matches.length === 1) {
+    // Autocomplete to the only match
+    rl.line = matches[0];
+    rl.cursor = matches[0].length;
+    rl._refreshLine();
+  } else if (matches.length > 1) {
+    // Display all matches
+    console.log("\n" + matches.join(" "));
+    rl.prompt(true);
   }
-  return commands;
 }
 
+// Listen for keypress events
+rl.input.on('keypress', (char, key) => {
+  if (key && key.name === 'tab') {
+    handleAutocomplete(rl.line);
+  }
+});
+
+// Rest of the shell functionality
 function checkIfCommandExistsInPath(builtin) {
   const paths = PATH.split(":");
   for (let path of paths) {
-    if (!fs.existsSync(path)) continue;
+    if (!fs.existsSync(path)) {
+      continue;
+    }
     const fileNames = fs.readdirSync(path);
     if (fileNames.includes(builtin)) {
       console.log(`${builtin} is ${path}/${builtin}`);
@@ -112,12 +112,23 @@ function handleChangeDirectory(answer) {
   currWorkDir = newWorkDir;
 }
 
+function handleLs() {
+  try {
+    const files = fs.readdirSync(currWorkDir);
+    console.log(files.join(" "));
+  } catch (error) {
+    console.log(`ls: cannot access '${currWorkDir}': No such file or directory`);
+  }
+}
+
 function handledExternalProgram(answer) {
   const paths = PATH.split(":");
   let foundPath = "";
   const program = answer.split(" ")[0];
   for (let path of paths) {
-    if (!fs.existsSync(path)) continue;
+    if (!fs.existsSync(path)) {
+      continue;
+    }
     const fileNames = fs.readdirSync(path);
     if (fileNames.includes(program)) {
       foundPath = path;
@@ -150,7 +161,8 @@ function handleAnswer(answer) {
       case "exit":
       case "pwd":
       case "cd":
-        console.log(`${builtin} is a shell builtin`)
+      case "ls":
+        console.log(`${builtin} is a shell builtin`);
         found = true;
         break;
       default:
@@ -164,6 +176,8 @@ function handleAnswer(answer) {
     console.log(currWorkDir);
   } else if (answer.startsWith("cd ")) {
     handleChangeDirectory(answer);
+  } else if (answer === "ls") {
+    handleLs();
   } else if (!handledExternalProgram(answer)) {
     console.log(`${answer}: command not found`);
   }
