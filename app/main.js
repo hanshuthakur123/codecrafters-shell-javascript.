@@ -19,8 +19,17 @@ function completer(line) {
     // If there's only one match, append a space to the completed command
     return [[hits[0] + ' '], line];
   }
-  
-  return [hits.length ? hits : [], line+''];
+   if (isFirstTabPress) {
+      // First tab press: ring the bell and do not autocomplete
+      process.stdout.write('\x07'); // Ring the bell
+      isFirstTabPress = false;
+      return [hits+' ', line];
+    } else {
+      // Second tab press: list all completions
+      isFirstTabPress = true; // Reset state
+      return [hits, line];
+    }
+
 }
 
 // Get all commands in PATH
