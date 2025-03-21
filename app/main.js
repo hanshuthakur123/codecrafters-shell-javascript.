@@ -1,14 +1,57 @@
 const execSync = require("child_process").execSync;
 const readline = require("readline");
 const fs = require('node:fs');
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
+
 const PATH = process.env.PATH;
 const splitCurrDir = __dirname.split("/");
 let currWorkDir = `/${splitCurrDir[splitCurrDir.length - 1]}`;
 
+// Function to find matching executables in PATH
+function findMatchingExecutables(partialCommand) {
+  const paths = PATH.split(":");
+  const matches = [];
+  for (let path of paths) {
+    if (!fs.existsSync(path)) {
+      continue;
+    }
+    const fileNames = fs.readdirSync(path);
+    for (let fileName of fileNames) {
+      if (fileName.startsWith(partialCommand)) {
+        matches.push(fileName);
+      }
+    }
+  }
+  return matches;
+}
+
+// Function to handle autocompletion
+function handleAutocomplete(line) {
+  const matches = findMatchingExecutables(line);
+  if (matches.length === 1) {
+    // Autocomplete to the only match
+    rl.line = matches[0];
+    rl.cursor = matches[0].length;
+    rl._refreshLine();
+  } else if (matches.length > 1) {
+    // Display all matches
+    console.log("\n" + matches.join(" "));
+    rl.prompt(true);
+  }
+}
+
+// Listen for keypress events
+rl.input.on('keypress', (char, key) => {
+  if (key && key.name === 'tab') {
+    handleAutocomplete(rl.line);
+  }
+});
+
+// Rest of the shell functionality
 function checkIfCommandExistsInPath(builtin) {
   const paths = PATH.split(":");
   for (let path of paths) {
