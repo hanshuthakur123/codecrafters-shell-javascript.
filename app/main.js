@@ -16,9 +16,7 @@ function findMatchingExecutables(partialCommand) {
   const paths = PATH.split(":");
   const matches = [];
   for (let path of paths) {
-    if (!fs.existsSync(path)) {
-      continue;
-    }
+    if (!fs.existsSync(path)) continue;
     const fileNames = fs.readdirSync(path);
     for (let fileName of fileNames) {
       if (fileName.startsWith(partialCommand)) {
@@ -55,9 +53,7 @@ rl.input.on('keypress', (char, key) => {
 function checkIfCommandExistsInPath(builtin) {
   const paths = PATH.split(":");
   for (let path of paths) {
-    if (!fs.existsSync(path)) {
-      continue;
-    }
+    if (!fs.existsSync(path)) continue;
     const fileNames = fs.readdirSync(path);
     if (fileNames.includes(builtin)) {
       console.log(`${builtin} is ${path}/${builtin}`);
@@ -126,9 +122,7 @@ function handledExternalProgram(answer) {
   let foundPath = "";
   const program = answer.split(" ")[0];
   for (let path of paths) {
-    if (!fs.existsSync(path)) {
-      continue;
-    }
+    if (!fs.existsSync(path)) continue;
     const fileNames = fs.readdirSync(path);
     if (fileNames.includes(program)) {
       foundPath = path;
@@ -138,7 +132,7 @@ function handledExternalProgram(answer) {
   if (foundPath !== "") {
     const output = execSync(answer);
     const outputString = output.toString();
-    console.log(outputString.slice(0, output.length - 1))
+    console.log(outputString.slice(0, output.length - 1));
     return true;
   }
   return false;
@@ -150,28 +144,9 @@ function handleAnswer(answer) {
     return;
   }
   if (answer.startsWith("echo ")) {
-    const text = answer.replace("echo ", "");
-    handleEcho(text);
+    handleEcho(answer.replace("echo ", ""));
   } else if (answer.startsWith("type ")) {
-    const builtin = answer.replace("type ", "");
-    let found = false;
-    switch (builtin) {
-      case "echo":
-      case "type":
-      case "exit":
-      case "pwd":
-      case "cd":
-      case "ls":
-        console.log(`${builtin} is a shell builtin`);
-        found = true;
-        break;
-      default:
-        found = checkIfCommandExistsInPath(builtin);
-        break;
-    }
-    if (!found) {
-      console.log(`${builtin}: not found`);
-    }
+    handleType(answer.replace("type ", ""));
   } else if (answer === "pwd") {
     console.log(currWorkDir);
   } else if (answer.startsWith("cd ")) {
@@ -182,6 +157,27 @@ function handleAnswer(answer) {
     console.log(`${answer}: command not found`);
   }
   repeat();
+}
+
+function handleType(builtin) {
+  let found = false;
+  switch (builtin) {
+    case "echo":
+    case "type":
+    case "exit":
+    case "pwd":
+    case "cd":
+    case "ls":
+      console.log(`${builtin} is a shell builtin`);
+      found = true;
+      break;
+    default:
+      found = checkIfCommandExistsInPath(builtin);
+      break;
+  }
+  if (!found) {
+    console.log(`${builtin}: not found`);
+  }
 }
 
 function repeat() {
