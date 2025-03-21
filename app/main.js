@@ -27,7 +27,7 @@ function completer(line) {
     } else {
       // Second tab press: list all completions
       isFirstTabPress = true; // Reset state
-      return [hits.length ? hits.join(' ') : [], line];    }
+      return [hits.length ? hits: hits[0], line];    }
 
 }
 
