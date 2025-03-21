@@ -1,132 +1,134 @@
+const { exec } = require("child_process");
 const readline = require("readline");
-const path = require("path");
 const fs = require("fs");
-const { execSync } = require('child_process');
+const os = require("os");
+const path = require("path");
 
+// Create readline interface
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
-const CMDS = ["type", "echo", "exit", "pwd", "cd"];
+// Get system PATH
+const PATH = process.env.PATH;
+const pathSeparator = os.platform() === "win32" ? ";" : ":";
+const homeDir = os.homedir();
+let currWorkDir = process.cwd();
 
-// Enable autocompletion
-rl.setCompleter((line) => {
-  const completions = getMatchingExecutables(line);
-  return [completions.length ? completions : [], line];
-});
-
-// Function to get matching executables
-function getMatchingExecutables(prefix) {
-  const paths = process.env.PATH.split(path.delimiter);
-  const matches = [];
-
-  for (const p of paths) {
+// Helper function to check if a command exists in PATH
+async function checkIfCommandExistsInPath(command) {
+  const paths = PATH.split(pathSeparator);
+  for (const dir of paths) {
     try {
-      const files = fs.readdirSync(p);
-      for (const file of files) {
-        if (file.startsWith(prefix) && fs.statSync(path.join(p, file)).isFile()) {
-          matches.push(file);
-        }
+      const files = await fs.promises.readdir(dir);
+      if (files.includes(command)) {
+        return path.join(dir, command);
       }
     } catch (err) {
-      // Ignore errors (e.g., invalid paths)
+      // Ignore errors (e.g., directory not accessible)
     }
   }
-
-  return matches.sort();
+  return null;
 }
 
-// Rest of your code...
-prepareShell();
-rl.on("line", (answer) => {
-  answer = answer.trim();
-  executeCommand(answer);
-  prepareShell();
-});
+// Handle echo command
+function handleEcho(text) {
+  if (text.startsWith("'") && text.endsWith("'") || text.startsWith('"') && text.endsWith('"')) {
+    text = text.slice(1, -1);
+  }
+  console.log(text);
+}
 
-function executeCommand(command) {
-  const { cmd, args } = getCmd(command);
-
-  if (command === "exit 0") {
-    process.exit(0);
+// Handle cd command
+function handleChangeDirectory(targetDir) {
+  if (targetDir === "~") {
+    currWorkDir = homeDir;
+    return;
   }
 
-  let res = `${command}: command not found`;
-  if (cmd === "echo") {
-    res = getEchoCmd(args, command);
-  } else if (cmd === "type") {
-    res = getTypeCmd(args[0]);
-  } else if (cmd === "pwd") {
-    res = process.cwd();
-  } else if (cmd === "cd") {
-    res = execCd(args);
-    if (res === undefined) {
+  const newDir = path.resolve(currWorkDir, targetDir);
+  if (!fs.existsSync(newDir)) {
+    console.log(`cd: ${targetDir}: No such file or directory`);
+    return;
+  }
+  currWorkDir = newDir;
+}
+
+// Handle external programs
+function handleExternalProgram(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = exec(`${command} ${args.join(" ")}`, { cwd: currWorkDir }, (error, stdout, stderr) => {
+      if (error) {
+        reject(error.message);
+        return;
+      }
+      if (stderr) {
+        console.error(stderr);
+      }
+      resolve(stdout.trim());
+    });
+  });
+}
+
+// Handle type command
+async function handleType(command) {
+  const builtins = ["echo", "type", "exit", "pwd", "cd"];
+  if (builtins.includes(command)) {
+    console.log(`${command} is a shell builtin`);
+    return;
+  }
+
+  const commandPath = await checkIfCommandExistsInPath(command);
+  if (commandPath) {
+    console.log(`${command} is ${commandPath}`);
+  } else {
+    console.log(`${command}: not found`);
+  }
+}
+
+// Handle user input
+async function handleAnswer(answer) {
+  const [command, ...args] = answer.trim().split(/\s+/);
+  if (!command) {
+    repeat();
+    return;
+  }
+
+  switch (command) {
+    case "echo":
+      handleEcho(args.join(" "));
+      break;
+    case "type":
+      await handleType(args[0]);
+      break;
+    case "exit":
+      rl.close();
       return;
-    }
-  } else {
-    res = execExternalProgram(cmd, command);
+    case "pwd":
+      console.log(currWorkDir);
+      break;
+    case "cd":
+      handleChangeDirectory(args[0] || homeDir);
+      break;
+    default:
+      try {
+        const output = await handleExternalProgram(command, args);
+        console.log(output);
+      } catch (err) {
+        console.log(`${command}: command not found`);
+      }
+      break;
   }
-
-  console.log(res);
+  repeat();
 }
 
-function prepareShell() {
-  process.stdout.write("$ ");
+// Repeat the prompt
+function repeat() {
+  rl.question("$ ", (answer) => {
+    handleAnswer(answer);
+  });
 }
 
-function getCmd(answer) {
-  let args = answer.split(/\s+/);
-  cmd = args[0];
-  args.shift();
-  return { cmd, args };
-}
-
-function getEchoCmd(args, command) {
-  let part = command.split("'");
-  let n = part.length;
-  if (n >= 3 && part[0].trim() === "echo" && part[n - 1].trim() === "") {
-    return part.slice(1, n - 1).join("");
-  }
-  return args.join(" ");
-}
-
-function getCmdFullPath(cmd) {
-  const paths = process.env.PATH.split(path.delimiter);
-  for (let p of paths) {
-    const fullPath = path.join(p, cmd);
-    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
-      return `${fullPath}`;
-    }
-  }
-  return "";
-}
-
-function getTypeCmd(cmdName) {
-  cmdFullPath = getCmdFullPath(cmdName);
-  if (CMDS.includes(cmdName)) {
-    return `${cmdName} is a shell builtin`;
-  } else if (cmdFullPath !== "") {
-    return `${cmdName} is ${cmdFullPath}`;
-  }
-  return `${cmdName}: not found`;
-}
-
-function execExternalProgram(cmd, command) {
-  cmdFullPath = getCmdFullPath(cmd);
-  if (cmdFullPath === "") {
-    return `${command}: command not found`;
-  }
-  return execSync(command).toString().trim();
-}
-
-function execCd(args) {
-  const path = args[0];
-  if (path === "~") {
-    process.chdir(process.env.HOME);
-  } else if (args.length > 1 || fs.existsSync(path) === false) {
-    return `cd: ${path}: No such file or directory`;
-  } else {
-    process.chdir(path);
-  }
-}
+// Start the shell
+repeat();
