@@ -33,11 +33,10 @@ function completer(line) {
       isFirstTabPress = false;
       return [[], line];
     } else {
-      // Second tab press: list all completions in a single line
+      // Second tab press: list all completions on a single line
       isFirstTabPress = true; // Reset state
-      process.stdout.write('\n'); // Move to a new line
-      console.log(hits.join("  ")); // Display completions separated by spaces
-      rl.prompt(true); // Reprint the prompt and input line
+      process.stdout.write(hits.join("  ") + "\n"); // Print completions on a single line
+      rl.prompt(true); // Re-display the prompt
       return [[], line];
     }
   }
