@@ -162,7 +162,7 @@ function completer(line) {
   }
 
   // Otherwise, return the common prefix (the shortest completion)
-  return [[commonPrefix], line];
+  return [[commonPrefix], line+' '];
 }
 
 // Helper function to find the longest common prefix of a list of strings
