@@ -1,7 +1,6 @@
 const execSync = require("child_process").execSync;
 const readline = require("readline");
 const fs = require('node:fs');
-
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -12,33 +11,24 @@ const PATH = process.env.PATH;
 const splitCurrDir = __dirname.split("/");
 let currWorkDir = `/${splitCurrDir[splitCurrDir.length - 1]}`;
 let isFirstTabPress = true;
-
 // Autocompletion function
 function completer(line) {
   const commands = getCommandsInPath();
   const hits = commands.filter(c => c.startsWith(line));
-
-  if (hits.length === 0) {
-    // No matches, do nothing
-    return [[], line];
-  } else if (hits.length === 1) {
-    // Single match, autocomplete and append a space
-    isFirstTabPress = true; // Reset state
-    return [[hits[0] + " "], line];
-  } else {
-    // Multiple matches
-    if (isFirstTabPress) {
+  if (hits.length === 1) {
+    // If there's only one match, append a space to the completed command
+    return [[hits[0] + ' '], line];
+  }
+   if (isFirstTabPress) {
       // First tab press: ring the bell and do not autocomplete
       process.stdout.write('\x07'); // Ring the bell
       isFirstTabPress = false;
-      return [[], line];
+      return [hits, line];
     } else {
       // Second tab press: list all completions
       isFirstTabPress = true; // Reset state
-      console.log(hits.join("  ")); // Display completions separated by spaces
-      return [[], line];
-    }
-  }
+      return [hits.length ? hits.join(' ') : [], line];    }
+
 }
 
 // Get all commands in PATH
