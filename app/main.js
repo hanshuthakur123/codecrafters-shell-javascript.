@@ -11,11 +11,14 @@ const PATH = process.env.PATH;
 const splitCurrDir = __dirname.split("/");
 let currWorkDir = `/${splitCurrDir[splitCurrDir.length - 1]}`;
 
+// Function to find matching executables in PATH
 function findMatchingExecutables(partialCommand) {
   const paths = PATH.split(":");
   const matches = [];
   for (let path of paths) {
-    if (!fs.existsSync(path)) continue;
+    if (!fs.existsSync(path)) {
+      continue;
+    }
     const fileNames = fs.readdirSync(path);
     for (let fileName of fileNames) {
       if (fileName.startsWith(partialCommand)) {
@@ -26,28 +29,35 @@ function findMatchingExecutables(partialCommand) {
   return matches;
 }
 
+// Function to handle autocompletion
 function handleAutocomplete(line) {
   const matches = findMatchingExecutables(line);
   if (matches.length === 1) {
+    // Autocomplete to the only match
     rl.line = matches[0];
     rl.cursor = matches[0].length;
     rl._refreshLine();
   } else if (matches.length > 1) {
+    // Display all matches
     console.log("\n" + matches.join(" "));
     rl.prompt(true);
   }
 }
 
+// Listen for keypress events
 rl.input.on('keypress', (char, key) => {
   if (key && key.name === 'tab') {
     handleAutocomplete(rl.line);
   }
 });
 
+// Rest of the shell functionality
 function checkIfCommandExistsInPath(builtin) {
   const paths = PATH.split(":");
   for (let path of paths) {
-    if (!fs.existsSync(path)) continue;
+    if (!fs.existsSync(path)) {
+      continue;
+    }
     const fileNames = fs.readdirSync(path);
     if (fileNames.includes(builtin)) {
       console.log(`${builtin} is ${path}/${builtin}`);
@@ -116,7 +126,9 @@ function handledExternalProgram(answer) {
   let foundPath = "";
   const program = answer.split(" ")[0];
   for (let path of paths) {
-    if (!fs.existsSync(path)) continue;
+    if (!fs.existsSync(path)) {
+      continue;
+    }
     const fileNames = fs.readdirSync(path);
     if (fileNames.includes(program)) {
       foundPath = path;
@@ -126,7 +138,7 @@ function handledExternalProgram(answer) {
   if (foundPath !== "") {
     const output = execSync(answer);
     const outputString = output.toString();
-    console.log(outputString.slice(0, output.length - 1));
+    console.log(outputString.slice(0, output.length - 1))
     return true;
   }
   return false;
@@ -138,9 +150,28 @@ function handleAnswer(answer) {
     return;
   }
   if (answer.startsWith("echo ")) {
-    handleEcho(answer.replace("echo ", ""));
+    const text = answer.replace("echo ", "");
+    handleEcho(text);
   } else if (answer.startsWith("type ")) {
-    handleType(answer.replace("type ", ""));
+    const builtin = answer.replace("type ", "");
+    let found = false;
+    switch (builtin) {
+      case "echo":
+      case "type":
+      case "exit":
+      case "pwd":
+      case "cd":
+      case "ls":
+        console.log(`${builtin} is a shell builtin`);
+        found = true;
+        break;
+      default:
+        found = checkIfCommandExistsInPath(builtin);
+        break;
+    }
+    if (!found) {
+      console.log(`${builtin}: not found`);
+    }
   } else if (answer === "pwd") {
     console.log(currWorkDir);
   } else if (answer.startsWith("cd ")) {
@@ -151,27 +182,6 @@ function handleAnswer(answer) {
     console.log(`${answer}: command not found`);
   }
   repeat();
-}
-
-function handleType(builtin) {
-  let found = false;
-  switch (builtin) {
-    case "echo":
-    case "type":
-    case "exit":
-    case "pwd":
-    case "cd":
-    case "ls":
-      console.log(`${builtin} is a shell builtin`);
-      found = true;
-      break;
-    default:
-      found = checkIfCommandExistsInPath(builtin);
-      break;
-  }
-  if (!found) {
-    console.log(`${builtin}: not found`);
-  }
 }
 
 function repeat() {
