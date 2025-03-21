@@ -40,6 +40,10 @@ function handleEcho(text) {
         result += parts[i];
       } else {
         // Even indices are outside single quotes (handle spaces)
+        if (parts[i].trim() !== "" && i > 0) {
+          // Add a space between adjacent single-quoted strings
+          result += " ";
+        }
         result += parts[i].trim();
       }
     }
