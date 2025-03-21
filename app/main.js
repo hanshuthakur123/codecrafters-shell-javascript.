@@ -15,6 +15,10 @@ let currWorkDir = `/${splitCurrDir[splitCurrDir.length - 1]}`;
 function completer(line) {
   const commands = getCommandsInPath();
   const hits = commands.filter(c => c.startsWith(line));
+  if (hits.length === 1) {
+    // If there's only one match, append a space to the completed command
+    return [[hits[0] + " "], line];
+  }
   return [hits.length ? hits : [], line];
 }
 
