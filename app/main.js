@@ -4,16 +4,36 @@ const fs = require('node:fs');
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
+  completer: completer // Add a completer function
 });
+
 const PATH = process.env.PATH;
 const splitCurrDir = __dirname.split("/");
 let currWorkDir = `/${splitCurrDir[splitCurrDir.length - 1]}`;
+
+// Autocompletion function
+function completer(line) {
+  const commands = getCommandsInPath();
+  const hits = commands.filter(c => c.startsWith(line));
+  return [hits.length ? hits : [], line];
+}
+
+// Get all commands in PATH
+function getCommandsInPath() {
+  const paths = PATH.split(":");
+  let commands = [];
+  for (let path of paths) {
+    if (!fs.existsSync(path)) continue;
+    const fileNames = fs.readdirSync(path);
+    commands = commands.concat(fileNames);
+  }
+  return commands;
+}
+
 function checkIfCommandExistsInPath(builtin) {
   const paths = PATH.split(":");
   for (let path of paths) {
-    if (!fs.existsSync(path)) {
-      continue;
-    }
+    if (!fs.existsSync(path)) continue;
     const fileNames = fs.readdirSync(path);
     if (fileNames.includes(builtin)) {
       console.log(`${builtin} is ${path}/${builtin}`);
@@ -22,6 +42,7 @@ function checkIfCommandExistsInPath(builtin) {
   }
   return false;
 }
+
 function handleEcho(text) {
   if (text.startsWith("'") && text.endsWith("'")) {
     const formattedString = text.slice(1, text.length - 1);
@@ -31,6 +52,7 @@ function handleEcho(text) {
   const formattedString = text.split(" ").filter(t => t !== "").join(" ");
   console.log(formattedString);
 }
+
 function handleChangeDirectory(answer) {
   let path = answer.split(" ")[1];
   if (path === "~") {
@@ -65,14 +87,13 @@ function handleChangeDirectory(answer) {
   }
   currWorkDir = newWorkDir;
 }
+
 function handledExternalProgram(answer) {
   const paths = PATH.split(":");
   let foundPath = "";
   const program = answer.split(" ")[0];
   for (let path of paths) {
-    if (!fs.existsSync(path)) {
-      continue;
-    }
+    if (!fs.existsSync(path)) continue;
     const fileNames = fs.readdirSync(path);
     if (fileNames.includes(program)) {
       foundPath = path;
@@ -87,6 +108,7 @@ function handledExternalProgram(answer) {
   }
   return false;
 }
+
 function handleAnswer(answer) {
   if (answer === "exit 0") {
     rl.close();
@@ -123,9 +145,11 @@ function handleAnswer(answer) {
   }
   repeat();
 }
+
 function repeat() {
   rl.question("$ ", (answer) => {
     handleAnswer(answer);
   });
 }
+
 repeat();
