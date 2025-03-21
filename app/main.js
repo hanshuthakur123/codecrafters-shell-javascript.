@@ -11,8 +11,6 @@ const rl = readline.createInterface({
 const PATH = process.env.PATH;
 const splitCurrDir = __dirname.split("/");
 let currWorkDir = `/${splitCurrDir[splitCurrDir.length - 1]}`;
-
-// Track the state of tab presses
 let isFirstTabPress = true;
 
 // Autocompletion function
@@ -35,9 +33,12 @@ function completer(line) {
       isFirstTabPress = false;
       return [[], line];
     } else {
-      // Second tab press: list all completions
+      // Second tab press: list all completions in a single line
       isFirstTabPress = true; // Reset state
-      return [hits, line];
+      process.stdout.write('\n'); // Move to a new line
+      console.log(hits.join("  ")); // Display completions separated by spaces
+      rl.prompt(true); // Reprint the prompt and input line
+      return [[], line];
     }
   }
 }
