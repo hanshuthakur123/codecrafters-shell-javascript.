@@ -19,7 +19,7 @@ function completer(line) {
     // If there's only one match, append a space to the completed command
     return [[hits[0] + ' '], line];
   }
-  return [hits.length ? hits : [], line];
+  return [hits.length ? hits : [], line+''];
 }
 
 // Get all commands in PATH
