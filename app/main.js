@@ -145,7 +145,7 @@ function completer(line) {
 
   if (hits.length === 1 && hits[0] === line) {
     // If there's only one match and it exactly matches the input, just return it
-    return [[line + ' '], line];
+    return [[line], line];
   }
 
   if (hits.length === 1 && hits[0] !== line) {
