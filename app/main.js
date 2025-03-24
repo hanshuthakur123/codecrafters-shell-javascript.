@@ -4,10 +4,12 @@ const fs = require('node:fs');
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
+  completer: completer
 });
 const PATH = process.env.PATH;
 const splitCurrDir = __dirname.split("/");
 let currWorkDir = `/${splitCurrDir[splitCurrDir.length - 1]}`;
+
 function checkIfCommandExistsInPath(builtin) {
   const paths = PATH.split(":");
   for (let path of paths) {
@@ -22,6 +24,7 @@ function checkIfCommandExistsInPath(builtin) {
   }
   return false;
 }
+
 function handleEcho(text) {
   if (text.startsWith("'") && text.endsWith("'")) {
     const formattedString = text.slice(1, text.length - 1);
@@ -31,6 +34,7 @@ function handleEcho(text) {
   const formattedString = text.split(" ").filter(t => t !== "").join(" ");
   console.log(formattedString);
 }
+
 function handleChangeDirectory(answer) {
   let path = answer.split(" ")[1];
   if (path === "~") {
@@ -65,6 +69,7 @@ function handleChangeDirectory(answer) {
   }
   currWorkDir = newWorkDir;
 }
+
 function handledExternalProgram(answer) {
   const paths = PATH.split(":");
   let foundPath = "";
@@ -87,6 +92,7 @@ function handledExternalProgram(answer) {
   }
   return false;
 }
+
 function handleAnswer(answer) {
   if (answer === "exit 0") {
     rl.close();
@@ -128,4 +134,37 @@ function repeat() {
     handleAnswer(answer);
   });
 }
+
+function completer(line) {
+  const completions = getMatchingCommands(line);
+  const hits = completions.filter((c) => c.startsWith(line));
+
+  if (hits.length === 0) {
+    // No matches, return nothing
+    return [[], line];
+  }
+
+  if (hits.length === 1) {
+    // If there's only one match, append a space after the autocompleted command
+    return [[hits[0] + ' '], line];
+  }
+
+  // If there are multiple matches, ring the bell and return the list of matches
+  process.stdout.write('\a'); // Ring the bell
+  return [hits, line]; // Return the list of completions without modifying the prompt
+}
+
+function getMatchingCommands(line) {
+  const paths = PATH.split(":");
+  let commands = [];
+  for (let path of paths) {
+    if (!fs.existsSync(path)) {
+      continue;
+    }
+    const fileNames = fs.readdirSync(path);
+    commands = commands.concat(fileNames);
+  }
+  return commands;
+}
+
 repeat();
