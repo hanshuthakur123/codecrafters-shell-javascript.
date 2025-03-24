@@ -155,6 +155,7 @@ function findCommonPrefix(strings) {
   return prefix;
 }
 
+
 function completer(line) {
   const completions = getMatchingCommands(line);
   const hits = completions.filter((c) => c.startsWith(line));
