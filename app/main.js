@@ -43,7 +43,7 @@ function completer(line) {
         // Display all completions on a single line
         process.stdout.write(hits.join("  ") + "\n"); // Print completions on a single line
         rl.prompt(true); // Re-display the prompt
-        return [[], line];
+        return [hits, line];
       }
     }
   }
