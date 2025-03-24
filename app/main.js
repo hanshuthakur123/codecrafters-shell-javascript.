@@ -1,56 +1,132 @@
-const execSync = require("child_process").execSync;
+const { execSync } = require("child_process");
 const readline = require("readline");
-const fs = require('node:fs');
+const fs = require("fs");
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
-  completer: completer // Add a completer function
+  completer: completer, // Add autocomplete functionality
 });
 
 const PATH = process.env.PATH;
-const splitCurrDir = __dirname.split("/");
-let currWorkDir = `/${splitCurrDir[splitCurrDir.length - 1]}`;
-let isFirstTabPress = true;
+let currentWorkingDir = process.cwd();
+let tabPressCount = 0; // Track the number of times <TAB> is pressed
 
-// Autocompletion function
+// Autocomplete function
 function completer(line) {
-  const commands = getCommandsInPath();
-  const hits = commands.filter(c => c.startsWith(line));
-
-  if (hits.length === 0) {
-    // No matches, do nothing
-    return [[], line];
-  } else if (hits.length === 1) {
-    // Single match, autocomplete and append a space
-    isFirstTabPress = true; // Reset state
-    return [[hits[0] + " "], line];
-  } else {
-    // Multiple matches
-    if (isFirstTabPress) {
-      // First tab press: ring the bell and do not autocomplete
+  const commands = getMatchingCommands(line);
+  if (commands.length === 1) {
+    // If there's only one match, append a space after the autocompleted command
+    tabPressCount = 0; // Reset tab press count
+    return [[commands[0]], line];
+  } else if (commands.length > 1) {
+    if (tabPressCount === 1) {
+      // If <TAB> is pressed twice, display all matches in a single line
+      const matchesString = commands.join(" "); // Join matches with spaces
+      console.log(matchesString); // Print the matches
       process.stdout.write('\x07'); // Ring the bell
-      isFirstTabPress = false;
-      return [[], line];
+      tabPressCount = 0; // Reset tab press count
     } else {
-      // Second tab press: find the longest common prefix
-      const longestPrefix = findLongestCommonPrefix(hits);
-      if (longestPrefix !== line) {
-        // Autocomplete to the longest common prefix
-        isFirstTabPress = true; // Reset state
-        return [[longestPrefix], line];
+      tabPressCount++; // Increment tab press count
+      const commonPrefix = findCommonPrefix(commands);
+      if (commonPrefix.length > line.length) {
+        return [[commonPrefix], line];
       } else {
-        // Display all completions on a single line
-        process.stdout.write(hits.join("  ") + "\n"); // Print completions on a single line
-        rl.prompt(true); // Re-display the prompt
-        return [hits, line];
+        return [commands, line]; // Return matching commands and the current line
       }
     }
   }
+  return [[], line]; // No matches
 }
 
-// Find the longest common prefix among an array of strings
-function findLongestCommonPrefix(strings) {
+// Get matching commands for autocomplete
+function getMatchingCommands(partialCommand) {
+  const paths = PATH.split(":");
+  const matches = new Set();
+
+  for (const path of paths) {
+    if (!fs.existsSync(path)) continue;
+    const files = fs.readdirSync(path);
+    for (const file of files) {
+      if (file.startsWith(partialCommand)) {
+        matches.add(file);
+      }
+    }
+  }
+
+  return Array.from(matches);
+}
+
+// Utility function to check if a command exists in PATH
+function checkIfCommandExistsInPath(command) {
+  const paths = PATH.split(":");
+  for (const path of paths) {
+    if (!fs.existsSync(path)) continue;
+    const files = fs.readdirSync(path);
+    if (files.includes(command)) {
+      console.log(`${command} is ${path}/${command}`);
+      return true;
+    }
+  }
+  return false;
+}
+
+// Handle 'echo' command
+function handleEcho(text) {
+  const formattedText = text.startsWith("'") && text.endsWith("'")
+    ? text.slice(1, -1).replaceAll("'", "")
+    : text.split(" ").filter(t => t !== "").join(" ");
+  console.log(formattedText);
+}
+
+// Handle 'cd' command
+function handleChangeDirectory(path) {
+  if (path === "~") {
+    currentWorkingDir = process.env.HOME;
+    return;
+  }
+
+  let newPath = path.startsWith("/") ? path : `${currentWorkingDir}/${path}`;
+
+  const steps = newPath.split("/");
+  let resolvedPath = [];
+
+  for (const step of steps) {
+    if (step === "..") {
+      resolvedPath.pop();
+    } else if (step !== "." && step !== "") {
+      resolvedPath.push(step);
+    }
+  }
+
+  newPath = resolvedPath.join("/");
+
+  if (!fs.existsSync(newPath)) {
+    console.log(`cd: ${path}: No such file or directory`);
+    return;
+  }
+
+  currentWorkingDir = newPath;
+}
+
+// Handle external programs
+function handleExternalProgram(command) {
+  const program = command.split(" ")[0];
+  const paths = PATH.split(":");
+
+  for (const path of paths) {
+    if (!fs.existsSync(path)) continue;
+    const files = fs.readdirSync(path);
+    if (files.includes(program)) {
+      const output = execSync(command).toString().trim();
+      console.log(output);
+      return true;
+    }
+  }
+  return false;
+}
+
+function findCommonPrefix(strings) {
   if (strings.length === 0) return "";
   let prefix = strings[0];
   for (let i = 1; i < strings.length; i++) {
@@ -62,138 +138,48 @@ function findLongestCommonPrefix(strings) {
   return prefix;
 }
 
-// Get all commands in PATH
-function getCommandsInPath() {
-  const paths = PATH.split(":");
-  let commands = [];
-  for (let path of paths) {
-    if (!fs.existsSync(path)) continue;
-    const fileNames = fs.readdirSync(path);
-    commands = commands.concat(fileNames);
-  }
-  return commands;
-}
-
-function checkIfCommandExistsInPath(builtin) {
-  const paths = PATH.split(":");
-  for (let path of paths) {
-    if (!fs.existsSync(path)) continue;
-    const fileNames = fs.readdirSync(path);
-    if (fileNames.includes(builtin)) {
-      console.log(`${builtin} is ${path}/${builtin}`);
-      return true;
-    }
-  }
-  return false;
-}
-
-function handleEcho(text) {
-  if (text.startsWith("'") && text.endsWith("'")) {
-    const formattedString = text.slice(1, text.length - 1);
-    console.log(formattedString.replaceAll("'", ""));
-    return;
-  }
-  const formattedString = text.split(" ").filter(t => t !== "").join(" ");
-  console.log(formattedString);
-}
-
-function handleChangeDirectory(answer) {
-  let path = answer.split(" ")[1];
-  if (path === "~") {
-    currWorkDir = process.env.HOME;
-    return;
-  }
-  let newWorkDir = "";
-  if (!path.startsWith(".")) {
-    path = path.slice(1);
-  } else {
-    newWorkDir = currWorkDir;
-  }
-  if (path.endsWith("/")) {
-    path = path.slice(0, path.length - 1);
-  }
-  const steps = path.split("/");
-  for (let step of steps) {
-    switch (step) {
-      case ".":
-        break;
-      case "..":
-        const splitNewWorkDir = newWorkDir.split("/");
-        newWorkDir = splitNewWorkDir.slice(0, splitNewWorkDir.length - 1).join("/");
-        break;
-      default:
-        newWorkDir += `/${step}`;
-    }
-    if (!fs.existsSync(newWorkDir)) {
-      console.log(`cd: ${answer.split(" ")[1]}: No such file or directory`);
-      return;
-    }
-  }
-  currWorkDir = newWorkDir;
-}
-
-function handledExternalProgram(answer) {
-  const paths = PATH.split(":");
-  let foundPath = "";
-  const program = answer.split(" ")[0];
-  for (let path of paths) {
-    if (!fs.existsSync(path)) continue;
-    const fileNames = fs.readdirSync(path);
-    if (fileNames.includes(program)) {
-      foundPath = path;
-      break;
-    }
-  }
-  if (foundPath !== "") {
-    const output = execSync(answer);
-    const outputString = output.toString();
-    console.log(outputString.slice(0, output.length - 1))
-    return true;
-  }
-  return false;
-}
-
+// Handle user input
 function handleAnswer(answer) {
   if (answer === "exit 0") {
     rl.close();
     return;
   }
-  if (answer.startsWith("echo ")) {
-    const text = answer.replace("echo ", "");
-    handleEcho(text);
-  } else if (answer.startsWith("type ")) {
-    const builtin = answer.replace("type ", "");
-    let found = false;
-    switch (builtin) {
-      case "echo":
-      case "type":
-      case "exit":
-      case "pwd":
-      case "cd":
-        console.log(`${builtin} is a shell builtin`)
-        found = true;
-        break;
-      default:
-        found = checkIfCommandExistsInPath(builtin);
-        break;
-    }
-    if (!found) {
-      console.log(`${builtin}: not found`);
-    }
-  } else if (answer === "pwd") {
-    console.log(currWorkDir);
-  } else if (answer.startsWith("cd ")) {
-    handleChangeDirectory(answer);
-  } else if (!handledExternalProgram(answer)) {
-    console.log(`${answer}: command not found`);
+
+  const [command, ...args] = answer.split(" ");
+
+  switch (command) {
+    case "echo":
+      handleEcho(args.join(" "));
+      break;
+    case "type":
+      const target = args[0];
+      const builtins = ["echo", "type", "exit", "pwd", "cd"];
+      if (builtins.includes(target)) {
+        console.log(`${target} is a shell builtin`);
+      } else if (!checkIfCommandExistsInPath(target)) {
+        console.log(`${target}: not found`);
+      }
+      break;
+    case "pwd":
+      console.log(currentWorkingDir);
+      break;
+    case "cd":
+      handleChangeDirectory(args[0]);
+      break;
+    default:
+      if (!handleExternalProgram(answer)) {
+        console.log(`${answer}: command not found`);
+      }
   }
+
   repeat();
 }
 
+// Repeat the prompt
 function repeat() {
-  rl.question("$ ", (answer) => {
-    handleAnswer(answer);
-  });
+  rl.question("$ ", handleAnswer);
 }
 
+// Start the shell
 repeat();
+
