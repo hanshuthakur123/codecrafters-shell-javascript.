@@ -157,9 +157,9 @@ function findCommonPrefix(strings) {
 
 function completer(line) {
   const allCommands = getMatchingCommands(line);
-  // Use Set to remove duplicates
-  const uniqueCommands = [...new Set(allCommands)];
+  const uniqueCommands =[...new Set(allCommands)];
   const hits = uniqueCommands.filter((c) => c.startsWith(line));
+
   if (hits.length === 0) {
     // No matches, return nothing
     return [[], line];
