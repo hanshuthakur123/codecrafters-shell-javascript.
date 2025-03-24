@@ -23,10 +23,10 @@ function completer(line) {
     const commonPrefix = findCommonPrefix(commands);
     if (tabPressCount === 1) {
       // Double <TAB>: display all matches without modifying the command line
-     // console.log(commands.join(" ")); // Print all matches
+      console.log(commands.join(" ")); // Print all matches
       process.stdout.write('\x07'); // Ring the bell
       tabPressCount = 0; // Reset tab press count
-      return [commands[0], line]; // Do not modify the command line
+      return [[], line]; // Do not modify the command line
     } else {
       // Single <TAB>: autocomplete to the longest common prefix
       tabPressCount++; // Increment tab press count
@@ -39,7 +39,17 @@ function completer(line) {
   }
   return [[], line]; // No matches
 }
-
+function findCommonPrefix(strings) {
+  if (strings.length === 0) return "";
+  let prefix = strings[0];
+  for (let i = 1; i < strings.length; i++) {
+    while (strings[i].indexOf(prefix) !== 0) {
+      prefix = prefix.slice(0, -1);
+      if (prefix === "") return "";
+    }
+  }
+  return prefix;
+}
 // Get matching commands for autocomplete
 function getMatchingCommands(partialCommand) {
   const paths = PATH.split(":");
@@ -130,17 +140,7 @@ function handleExternalProgram(command) {
   }
   return false;
 }
-function findCommonPrefix(strings) {
-  if (strings.length === 0) return "";
-  let prefix = strings[0];
-  for (let i = 1; i < strings.length; i++) {
-    while (strings[i].indexOf(prefix) !== 0) {
-      prefix = prefix.slice(0, -1);
-      if (prefix === "") return "";
-    }
-  }
-  return prefix;
-}
+
 // Handle user input
 function handleAnswer(answer) {
   if (answer === "exit 0") {
