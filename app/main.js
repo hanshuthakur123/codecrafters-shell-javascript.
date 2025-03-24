@@ -1,149 +1,18 @@
-const execSync = require("child_process").execSync;
+const { execSync } = require("child_process");
 const readline = require("readline");
-const fs = require("node:fs");
+const fs = require("fs");
 
-// Initialize readline interface
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
-  completer: completer, // Add a completer function
+  completer: completer, // Add autocomplete functionality
 });
 
-// Global state
-let currentWorkingDirectory = getCurrentWorkingDirectory();
-let isFirstTabPress = true;
+const PATH = process.env.PATH;
+let currentWorkingDir = process.cwd();
+let tabPressCount = 0; // Track the number of times <TAB> is pressed
 
-// Main function to start the shell
-function startShell() {
-  //console.log("Simple Shell. Type 'exit 0' to quit.");
-  promptUser();
-}
-
-// Function to prompt the user for input
-function promptUser() {
-  rl.question("$ ", (answer) => {
-    handleCommand(answer);
-  });
-}
-
-// Function to handle user commands
-function handleCommand(command) {
-  if (command === "exit 0") {
-    rl.close();
-    return;
-  }
-
-  if (command.startsWith("echo ")) {
-    handleEcho(command);
-  } else if (command.startsWith("type ")) {
-    handleType(command);
-  } else if (command === "pwd") {
-    handlePwd();
-  } else if (command.startsWith("cd ")) {
-    handleChangeDirectory(command);
-  } else {
-    handleExternalProgram(command);
-  }
-
-  promptUser(); // Continue prompting for the next command
-}
-
-// Function to handle the 'echo' command
-function handleEcho(command) {
-  const text = command.replace("echo ", "").trim();
-  if (text.startsWith("'") && text.endsWith("'")) {
-    console.log(text.slice(1, -1).replaceAll("'", ""));
-  } else {
-    console.log(text.split(" ").filter((t) => t !== "").join(" "));
-  }
-}
-
-// Function to handle the 'type' command
-function handleType(command) {
-  const program = command.replace("type ", "").trim();
-  const builtins = ["echo", "type", "exit", "pwd", "cd"];
-
-  if (builtins.includes(program)) {
-    console.log(`${program} is a shell builtin`);
-  } else if (checkIfCommandExistsInPath(program)) {
-    console.log(`${program} is ${getCommandPath(program)}`);
-  } else {
-    console.log(`${program}: not found`);
-  }
-}
-
-// Function to handle the 'pwd' command
-function handlePwd() {
-  console.log(currentWorkingDirectory);
-}
-
-// Function to handle the 'cd' command
-function handleChangeDirectory(command) {
-  const path = command.split(" ")[1];
-  if (path === "~") {
-    currentWorkingDirectory = process.env.HOME;
-    return;
-  }
-
-  let newPath = resolvePath(path, currentWorkingDirectory);
-  if (!fs.existsSync(newPath)) {
-    console.log(`cd: ${path}: No such file or directory`);
-    return;
-  }
-
-  currentWorkingDirectory = newPath;
-}
-
-// Function to resolve a relative or absolute path
-function resolvePath(path, baseDir) {
-  if (path.startsWith("/")) {
-    return path;
-  }
-  return `${baseDir}/${path}`;
-}
-
-// Function to handle external programs
-function handleExternalProgram(command) {
-  const program = command.split(" ")[0];
-  const programPath = getCommandPath(program);
-
-  if (programPath) {
-    try {
-      const output = execSync(command);
-      console.log(output.toString().trim());
-    } catch (error) {
-      console.log(`${program}: execution failed`);
-    }
-  } else {
-    console.log(`${program}: command not found`);
-  }
-}
-
-// Function to check if a command exists in PATH
-function checkIfCommandExistsInPath(program) {
-  return !!getCommandPath(program);
-}
-
-// Function to get the full path of a command
-function getCommandPath(program) {
-  const paths = process.env.PATH.split(":");
-  for (const path of paths) {
-    if (!fs.existsSync(path)) continue;
-    const fileNames = fs.readdirSync(path);
-    if (fileNames.includes(program)) {
-      return `${path}/${program}`;
-    }
-  }
-  return null;
-}
-
-// Function to get the current working directory
-function getCurrentWorkingDirectory() {
-  const dirParts = __dirname.split("/");
-  return `/${dirParts[dirParts.length - 1]}`;
-}
-
-// Autocompletion function
+// Autocomplete function
 function completer(line) {
   const commands = getMatchingCommands(line);
   if (commands.length === 1) {
@@ -171,30 +40,138 @@ function completer(line) {
   return [[], line]; // No matches
 }
 
-// Function to find the longest common prefix among strings
-function findLongestCommonPrefix(strings) {
-  if (strings.length === 0) return "";
-  let prefix = strings[0];
-  for (let i = 1; i < strings.length; i++) {
-    while (strings[i].indexOf(prefix) !== 0) {
-      prefix = prefix.slice(0, -1);
-      if (prefix === "") return "";
-    }
-  }
-  return prefix;
-}
+// Get matching commands for autocomplete
+function getMatchingCommands(partialCommand) {
+  const paths = PATH.split(":");
+  const matches = new Set();
 
-// Function to get all commands in PATH
-function getCommandsInPath() {
-  const paths = process.env.PATH.split(":");
-  let commands = [];
   for (const path of paths) {
     if (!fs.existsSync(path)) continue;
-    const fileNames = fs.readdirSync(path);
-    commands = commands.concat(fileNames);
+    const files = fs.readdirSync(path);
+    for (const file of files) {
+      if (file.startsWith(partialCommand)) {
+        matches.add(file);
+      }
+    }
   }
-  return commands;
+
+  return Array.from(matches);
+}
+
+// Utility function to check if a command exists in PATH
+function checkIfCommandExistsInPath(command) {
+  const paths = PATH.split(":");
+  for (const path of paths) {
+    if (!fs.existsSync(path)) continue;
+    const files = fs.readdirSync(path);
+    if (files.includes(command)) {
+      console.log(`${command} is ${path}/${command}`);
+      return true;
+    }
+  }
+  return false;
+}
+
+// Handle 'echo' command
+function handleEcho(text) {
+  const formattedText = text.startsWith("'") && text.endsWith("'")
+    ? text.slice(1, -1).replaceAll("'", "")
+    : text.split(" ").filter(t => t !== "").join(" ");
+  console.log(formattedText);
+}
+
+// Handle 'cd' command
+function handleChangeDirectory(path) {
+  if (path === "~") {
+    currentWorkingDir = process.env.HOME;
+    return;
+  }
+
+  const newPath = path.startsWith("/") ? path : `${currentWorkingDir}/${path}`;
+  const resolvedPath = resolvePath(newPath);
+
+  if (!fs.existsSync(resolvedPath)) {
+    console.log(`cd: ${path}: No such file or directory`);
+    return;
+  }
+
+  currentWorkingDir = resolvedPath;
+}
+
+// Resolve a path by handling `.`, `..`, and empty segments
+function resolvePath(path) {
+  const steps = path.split("/");
+  const resolvedPath = [];
+
+  for (const step of steps) {
+    if (step === "..") {
+      resolvedPath.pop();
+    } else if (step !== "." && step !== "") {
+      resolvedPath.push(step);
+    }
+  }
+
+  return resolvedPath.join("/");
+}
+
+// Handle external programs
+function handleExternalProgram(command) {
+  const program = command.split(" ")[0];
+  const paths = PATH.split(":");
+
+  for (const path of paths) {
+    if (!fs.existsSync(path)) continue;
+    const files = fs.readdirSync(path);
+    if (files.includes(program)) {
+      const output = execSync(command).toString().trim();
+      console.log(output);
+      return true;
+    }
+  }
+  return false;
+}
+
+// Handle user input
+function handleAnswer(answer) {
+  if (answer === "exit 0") {
+    rl.close();
+    return;
+  }
+
+  const [command, ...args] = answer.split(" ");
+  const builtins = ["echo", "type", "exit", "pwd", "cd"];
+
+  switch (command) {
+    case "echo":
+      handleEcho(args.join(" "));
+      break;
+    case "type":
+      const target = args[0];
+      if (builtins.includes(target)) {
+        console.log(`${target} is a shell builtin`);
+      } else if (!checkIfCommandExistsInPath(target)) {
+        console.log(`${target}: not found`);
+      }
+      break;
+    case "pwd":
+      console.log(currentWorkingDir);
+      break;
+    case "cd":
+      handleChangeDirectory(args[0]);
+      break;
+    default:
+      if (!handleExternalProgram(answer)) {
+        console.log(`${answer}: command not found`);
+      }
+  }
+
+  repeat();
+}
+
+// Repeat the prompt
+function repeat() {
+  rl.question("$ ", handleAnswer);
 }
 
 // Start the shell
-startShell();
+repeat();
