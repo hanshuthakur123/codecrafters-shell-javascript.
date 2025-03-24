@@ -170,7 +170,7 @@ function completer(line) {
     // If there's only one match, append a space after the autocompleted command
     return [[hits[0]], line];
   }
-  if (hits.length === 1 && hits[0].startsWith(line)) {
+  if (hits.length === 1) {
     // If there's only one match, append a space after the autocompleted command
     return [[hits[0]+' '], line];
   }
@@ -199,15 +199,24 @@ function completer(line) {
 
 function getMatchingCommands(line) {
   const paths = PATH.split(":");
-  let commands = [];
+  // Use a Set to automatically eliminate duplicates
+  const uniqueCommands = new Set();
+  
   for (let path of paths) {
     if (!fs.existsSync(path)) {
       continue;
     }
     const fileNames = fs.readdirSync(path);
-    commands = commands.concat(fileNames);
+    // Only add commands that match the line prefix
+    for (const fileName of fileNames) {
+      if (fileName.startsWith(line)) {
+        uniqueCommands.add(fileName);
+      }
+    }
   }
-  return commands;
+  
+  // Convert Set back to array
+  return Array.from(uniqueCommands);
 }
 
 repeat();
