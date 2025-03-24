@@ -31,15 +31,35 @@ function completer(line) {
       // First tab press: ring the bell and do not autocomplete
       process.stdout.write('\x07'); // Ring the bell
       isFirstTabPress = false;
-      return [hits, line];
-    } else {
-      // Second tab press: list all completions on a single line
-      isFirstTabPress = true; // Reset state
-      process.stdout.write(hits.join("  ") + "\n"); // Print completions on a single line
-      rl.prompt(true); // Re-display the prompt
       return [[], line];
+    } else {
+      // Second tab press: find the longest common prefix
+      const longestPrefix = findLongestCommonPrefix(hits);
+      if (longestPrefix !== line) {
+        // Autocomplete to the longest common prefix
+        isFirstTabPress = true; // Reset state
+        return [[longestPrefix], line];
+      } else {
+        // Display all completions on a single line
+        process.stdout.write(hits.join("  ") + "\n"); // Print completions on a single line
+        rl.prompt(true); // Re-display the prompt
+        return [[], line];
+      }
     }
   }
+}
+
+// Find the longest common prefix among an array of strings
+function findLongestCommonPrefix(strings) {
+  if (strings.length === 0) return "";
+  let prefix = strings[0];
+  for (let i = 1; i < strings.length; i++) {
+    while (strings[i].indexOf(prefix) !== 0) {
+      prefix = prefix.slice(0, -1);
+      if (prefix === "") return "";
+    }
+  }
+  return prefix;
 }
 
 // Get all commands in PATH
