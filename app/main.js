@@ -1,4 +1,3 @@
-
 const execSync = require("child_process").execSync;
 const readline = require("readline");
 const fs = require('node:fs');
@@ -165,34 +164,33 @@ function completer(line) {
     return [[], line];
   }
 
- 
-  if (hits.length === 1  && hits[0] === line) {
+  if (hits.length === 1 && hits[0] === line) {
     // If there's only one match, append a space after the autocompleted command
     return [[hits[0]], line];
   }
-  if (hits.length === 1) {
+  if (hits.length === 1 && hits[0] !== line) {
     // If there's only one match, append a space after the autocompleted command
     return [[hits[0]+' '], line];
   }
   // Find the common prefix among all matches
   const commonPrefix = findCommonPrefix(hits);
-  
+
   // If we can complete more than what's already typed
   if (commonPrefix.length > line.length) {
-    return [[commonPrefix], line];
+    return [[[commonPrefix]], line];
   }
-  
+
   // Otherwise, show all options
   console.log(); // Move to a new line
   console.log(hits.join('  ')); // Display all options with double spaces between them
-  
+
   // Ring the bell
   process.stdout.write('\x07');
-  
+
   // Redisplay the prompt with the current input
-  rl.write(null, {ctrl: true, name: 'u'}); // Clear the line
-  rl.write(`${line}`); // Rewrite the prompt and current input
-  
+  rl.write(null, { ctrl: true, name: 'u' }); // Clear the line
+  rl.write(line); // Rewrite the prompt and current input
+
   // Return empty array to prevent readline from modifying the prompt
   return [[], line];
 }
