@@ -157,7 +157,7 @@ function completer(line) {
     if (isFirstTabPress) {
       process.stdout.write("\x07"); // Ring the bell
       isFirstTabPress = false;
-      return [[], line];
+      return [matches[0], line];
     } else {
       const longestPrefix = findLongestCommonPrefix(matches);
       if (longestPrefix !== line) {
