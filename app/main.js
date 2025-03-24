@@ -54,13 +54,25 @@ function getCommandsInPath() {
 
 // Handle echo command
 function handleEcho(text) {
-  if (text.startsWith("'") && text.endsWith("'")) {
-    const formattedString = text.slice(1, text.length - 1);
-    console.log(formattedString.replaceAll("'", ""));
-    return;
+  const singleQuotedRegex = /'([^']*)'/g;
+  let match;
+  let lastIndex = 0;
+  let result = "";
+
+  // Process the text to preserve single-quoted strings
+  while ((match = singleQuotedRegex.exec(text)) !== null) {
+    // Add text before the single-quoted string
+    result += text.slice(lastIndex, match.index).trim() + " ";
+    // Add the single-quoted string content (preserve spaces)
+    result += match[1] + " ";
+    lastIndex = singleQuotedRegex.lastIndex;
   }
-  const formattedString = text.split(" ").filter((t) => t !== "").join(" ");
-  console.log(formattedString);
+
+  // Add any remaining text after the last single-quoted string
+  result += text.slice(lastIndex).trim();
+
+  // Remove trailing space and log the result
+  console.log(result.trim());
 }
 
 // Handle type command
