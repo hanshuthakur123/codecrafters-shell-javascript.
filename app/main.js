@@ -15,20 +15,28 @@ let isFirstTabPress = true;
 function completer(line) {
   const commands = getCommandsInPath();
   const hits = commands.filter(c => c.startsWith(line));
+
+  if (hits.length === 0) {
+    process.stdout.write('\x07'); // Ring the bell
+    return [[], line];
+  }
+
   if (hits.length === 1) {
     // If there's only one match, append a space to the completed command
     return [[hits[0] + ' '], line];
   }
-   if (isFirstTabPress) {
-      // First tab press: ring the bell and do not autocomplete
-      process.stdout.write('\x07'); // Ring the bell
-     // isFirstTabPress = false;
-      return [hits, line];
-    } else {
-      // Second tab press: list all completions
-      isFirstTabPress = true; // Reset state
-      return [hits.length ? hits[0]+' ' : [' '], line];    }
 
+  if (isFirstTabPress) {
+    // First tab press: ring the bell and do not autocomplete
+    process.stdout.write('\x07'); // Ring the bell
+    isFirstTabPress = false;
+    return [[], line]; // Return no completions
+  } else {
+    // Second tab press: list all completions in a single line
+    isFirstTabPress = true; // Reset state
+    const completions = hits.join(' '); // Join completions with spaces
+    return [[completions], line];
+  }
 }
 
 // Get all commands in PATH
