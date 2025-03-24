@@ -24,20 +24,20 @@ function completer(line) {
   } else if (hits.length === 1) {
     // Single match, autocomplete and append a space
     isFirstTabPress = true; // Reset state
-    return [[hits[0]], line];
+    return [[hits[0] + " "], line];
   } else {
     // Multiple matches
     if (isFirstTabPress) {
       // First tab press: ring the bell and do not autocomplete
       process.stdout.write('\x07'); // Ring the bell
       isFirstTabPress = false;
-      return [hits, line];
+      return [[], line];
     } else {
       // Second tab press: list all completions on a single line
       isFirstTabPress = true; // Reset state
       process.stdout.write(hits.join("  ") + "\n"); // Print completions on a single line
       rl.prompt(true); // Re-display the prompt
-      return [hits, line];
+      return [[], line];
     }
   }
 }
