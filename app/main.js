@@ -145,31 +145,30 @@ function getCurrentWorkingDirectory() {
 
 // Autocompletion function
 function completer(line) {
-  const commands = getCommandsInPath();
-  const matches = commands.filter((cmd) => cmd.startsWith(line));
-
-  if (matches.length === 0) {
-    return [[], line];
-  } else if (matches.length === 1) {
-    isFirstTabPress = true;
-    return [[matches[0] + " "], line];
-  } else {
-    if (isFirstTabPress) {
-      process.stdout.write("\x07"); // Ring the bell
-      isFirstTabPress = false;
-      return [matches[0], line];
+  const commands = getMatchingCommands(line);
+  if (commands.length === 1) {
+    // Single match: autocomplete and append a space
+    tabPressCount = 0; // Reset tab press count
+    return [[commands[0] + " "], commands[0]]; // Return the completed command
+  } else if (commands.length > 1) {
+    const commonPrefix = findCommonPrefix(commands);
+    if (tabPressCount === 1) {
+      // Double <TAB>: display all matches without modifying the command line
+      console.log(commands.join(" ")); // Print all matches
+      process.stdout.write('\x07'); // Ring the bell
+      tabPressCount = 0; // Reset tab press count
+      return [[], line]; // Do not modify the command line
     } else {
-      const longestPrefix = findLongestCommonPrefix(matches);
-      if (longestPrefix !== line) {
-        isFirstTabPress = true;
-        return [[longestPrefix], line];
+      // Single <TAB>: autocomplete to the longest common prefix
+      tabPressCount++; // Increment tab press count
+      if (commonPrefix.length > line.length) {
+        return [[commonPrefix], commonPrefix]; // Autocomplete to the common prefix
       } else {
-        process.stdout.write(matches.join("  ") + "\n");
-        rl.prompt(true);
-        return [[], line];
+        return [commands, line]; // Return all matches
       }
     }
   }
+  return [[], line]; // No matches
 }
 
 // Function to find the longest common prefix among strings
