@@ -23,7 +23,7 @@ function completer(line) {
     const commonPrefix = findCommonPrefix(commands);
     if (tabPressCount === 1) {
       // Double <TAB>: display all matches without modifying the command line
-      console.log(commands.join(" ")); // Print all matches
+     // console.log(commands.join(" ")); // Print all matches
       process.stdout.write('\x07'); // Ring the bell
       tabPressCount = 0; // Reset tab press count
       return [[], line]; // Do not modify the command line
