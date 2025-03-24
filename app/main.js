@@ -2,6 +2,7 @@ const { execSync } = require("child_process");
 const readline = require("readline");
 const fs = require("fs");
 
+// Initialize readline interface
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -12,34 +13,64 @@ const PATH = process.env.PATH;
 let currentWorkingDir = process.cwd();
 let tabPressCount = 0; // Track the number of times <TAB> is pressed
 
-// Autocomplete function
+// ========================
+// Autocomplete Functionality
+// ========================
+
+/**
+ * Autocomplete function for readline.
+ * @param {string} line - The current input line.
+ * @returns {[string[], string]} - Array of matches and the current line.
+ */
 function completer(line) {
   const commands = getMatchingCommands(line);
   if (commands.length === 1) {
-    // If there's only one match, append a space after the autocompleted command
+    // Single match: autocomplete and append a space
     tabPressCount = 0; // Reset tab press count
-    return [[commands[0]], line];
+    return [[commands[0] + " "], line];
   } else if (commands.length > 1) {
     if (tabPressCount === 1) {
-      // If <TAB> is pressed twice, display all matches in a single line
-      const matchesString = commands.join(" "); // Join matches with spaces
-      console.log(matchesString); // Print the matches
+      // Double <TAB>: display all matches
+      console.log(commands.join(" ")); // Print all matches
       process.stdout.write('\x07'); // Ring the bell
       tabPressCount = 0; // Reset tab press count
+      return [[], line]; // Do not modify the command line
     } else {
+      // Single <TAB>: autocomplete to the common prefix
       tabPressCount++; // Increment tab press count
       const commonPrefix = findCommonPrefix(commands);
       if (commonPrefix.length > line.length) {
-        return [[commonPrefix], line];
+        return [[commonPrefix], line]; // Autocomplete to the common prefix
       } else {
-        return [commands, line]; // Return matching commands and the current line
+        return [commands, line]; // Return all matches
       }
     }
   }
   return [[], line]; // No matches
 }
 
-// Get matching commands for autocomplete
+/**
+ * Find the longest common prefix among an array of strings.
+ * @param {string[]} strings - Array of strings.
+ * @returns {string} - The longest common prefix.
+ */
+function findCommonPrefix(strings) {
+  if (strings.length === 0) return "";
+  let prefix = strings[0];
+  for (let i = 1; i < strings.length; i++) {
+    while (strings[i].indexOf(prefix) !== 0) {
+      prefix = prefix.slice(0, -1);
+      if (prefix === "") return "";
+    }
+  }
+  return prefix;
+}
+
+/**
+ * Get all commands in PATH that match the partial command.
+ * @param {string} partialCommand - The partial command to match.
+ * @returns {string[]} - Array of matching commands.
+ */
 function getMatchingCommands(partialCommand) {
   const paths = PATH.split(":");
   const matches = new Set();
@@ -57,21 +88,14 @@ function getMatchingCommands(partialCommand) {
   return Array.from(matches);
 }
 
-// Utility function to check if a command exists in PATH
-function checkIfCommandExistsInPath(command) {
-  const paths = PATH.split(":");
-  for (const path of paths) {
-    if (!fs.existsSync(path)) continue;
-    const files = fs.readdirSync(path);
-    if (files.includes(command)) {
-      console.log(`${command} is ${path}/${command}`);
-      return true;
-    }
-  }
-  return false;
-}
+// ========================
+// Command Handlers
+// ========================
 
-// Handle 'echo' command
+/**
+ * Handle the 'echo' command.
+ * @param {string} text - The text to echo.
+ */
 function handleEcho(text) {
   const formattedText = text.startsWith("'") && text.endsWith("'")
     ? text.slice(1, -1).replaceAll("'", "")
@@ -79,17 +103,35 @@ function handleEcho(text) {
   console.log(formattedText);
 }
 
-// Handle 'cd' command
+/**
+ * Handle the 'cd' command.
+ * @param {string} path - The directory path to change to.
+ */
 function handleChangeDirectory(path) {
   if (path === "~") {
     currentWorkingDir = process.env.HOME;
     return;
   }
 
-  let newPath = path.startsWith("/") ? path : `${currentWorkingDir}/${path}`;
+  const newPath = path.startsWith("/") ? path : `${currentWorkingDir}/${path}`;
+  const resolvedPath = resolvePath(newPath);
 
-  const steps = newPath.split("/");
-  let resolvedPath = [];
+  if (!fs.existsSync(resolvedPath)) {
+    console.log(`cd: ${path}: No such file or directory`);
+    return;
+  }
+
+  currentWorkingDir = resolvedPath;
+}
+
+/**
+ * Resolve a path by handling `.`, `..`, and empty segments.
+ * @param {string} path - The path to resolve.
+ * @returns {string} - The resolved path.
+ */
+function resolvePath(path) {
+  const steps = path.split("/");
+  const resolvedPath = [];
 
   for (const step of steps) {
     if (step === "..") {
@@ -99,17 +141,14 @@ function handleChangeDirectory(path) {
     }
   }
 
-  newPath = resolvedPath.join("/");
-
-  if (!fs.existsSync(newPath)) {
-    console.log(`cd: ${path}: No such file or directory`);
-    return;
-  }
-
-  currentWorkingDir = newPath;
+  return resolvedPath.join("/");
 }
 
-// Handle external programs
+/**
+ * Handle external programs.
+ * @param {string} command - The command to execute.
+ * @returns {boolean} - True if the command was executed, false otherwise.
+ */
 function handleExternalProgram(command) {
   const program = command.split(" ")[0];
   const paths = PATH.split(":");
@@ -126,19 +165,32 @@ function handleExternalProgram(command) {
   return false;
 }
 
-function findCommonPrefix(strings) {
-  if (strings.length === 0) return "";
-  let prefix = strings[0];
-  for (let i = 1; i < strings.length; i++) {
-    while (strings[i].indexOf(prefix) !== 0) {
-      prefix = prefix.slice(0, -1);
-      if (prefix === "") return "";
+/**
+ * Check if a command exists in PATH.
+ * @param {string} command - The command to check.
+ * @returns {boolean} - True if the command exists, false otherwise.
+ */
+function checkIfCommandExistsInPath(command) {
+  const paths = PATH.split(":");
+  for (const path of paths) {
+    if (!fs.existsSync(path)) continue;
+    const files = fs.readdirSync(path);
+    if (files.includes(command)) {
+      console.log(`${command} is ${path}/${command}`);
+      return true;
     }
   }
-  return prefix;
+  return false;
 }
 
-// Handle user input
+// ========================
+// Shell Core Functionality
+// ========================
+
+/**
+ * Handle user input.
+ * @param {string} answer - The user's input.
+ */
 function handleAnswer(answer) {
   if (answer === "exit 0") {
     rl.close();
@@ -146,6 +198,7 @@ function handleAnswer(answer) {
   }
 
   const [command, ...args] = answer.split(" ");
+  const builtins = ["echo", "type", "exit", "pwd", "cd"];
 
   switch (command) {
     case "echo":
@@ -153,7 +206,6 @@ function handleAnswer(answer) {
       break;
     case "type":
       const target = args[0];
-      const builtins = ["echo", "type", "exit", "pwd", "cd"];
       if (builtins.includes(target)) {
         console.log(`${target} is a shell builtin`);
       } else if (!checkIfCommandExistsInPath(target)) {
@@ -175,11 +227,12 @@ function handleAnswer(answer) {
   repeat();
 }
 
-// Repeat the prompt
+/**
+ * Repeat the prompt.
+ */
 function repeat() {
   rl.question("$ ", handleAnswer);
 }
 
 // Start the shell
 repeat();
-
