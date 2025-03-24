@@ -17,7 +17,7 @@ function completer(line) {
   const hits = commands.filter(c => c.startsWith(line));
   if (hits.length === 1) {
     // If there's only one match, append a space to the completed command
-    return [[hits[0] ], line];
+    return [[hits[0] + ' '], line];
   }
    if (isFirstTabPress) {
       // First tab press: ring the bell and do not autocomplete
