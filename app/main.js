@@ -172,7 +172,7 @@ function completer(line) {
   }
   if (hits.length === 1) {
     // If there's only one match, append a space after the autocompleted command
-    return [[hits[0]+' ' ], line];
+    return [[hits[0]+' '], line];
   }
   // Find the common prefix among all matches
   const commonPrefix = findCommonPrefix(hits);
@@ -183,8 +183,8 @@ function completer(line) {
   }
   
   // Otherwise, show all options
-  console.log(); // Move to a new line
-  console.log(hits.join('  ')); // Display all options with double spaces between them
+ // console.log(); // Move to a new line
+  //console.log(hits.join('  ')); // Display all options with double spaces between them
   
   // Ring the bell
   process.stdout.write('\x07');
