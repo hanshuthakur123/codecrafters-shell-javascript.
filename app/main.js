@@ -129,6 +129,7 @@ function handleAnswer(answer) {
   }
   repeat();
 }
+
 function repeat() {
   rl.question("$ ", (answer) => {
     handleAnswer(answer);
@@ -149,9 +150,17 @@ function completer(line) {
     return [[hits[0]+' '], line];
   }
 
-  // If there are multiple matches, ring the bell and return the list of matches
-  process.stdout.write('\x07'); // Ring the bell
-  return [hits, line]; // Return the list of completions without modifying the prompt
+  // Show all possibilities for multiple matches
+  console.log(); // Move to a new line
+  console.log(hits.join('  ')); // Display all options with double spaces between them
+  rl.write(null, {ctrl: true, name: 'u'}); // Clear the line
+  rl.write(`$ ${line}`); // Rewrite the prompt and current input
+  
+  // Ring the bell for multiple matches
+  process.stdout.write('\x07');
+  
+  // Return empty array to prevent readline from modifying the prompt
+  return [[], line];
 }
 
 function getMatchingCommands(line) {
