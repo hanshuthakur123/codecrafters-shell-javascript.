@@ -136,6 +136,25 @@ function repeat() {
   });
 }
 
+// Find the longest common prefix of an array of strings
+function findCommonPrefix(strings) {
+  if (strings.length === 0) return '';
+  if (strings.length === 1) return strings[0];
+  
+  let prefix = strings[0];
+  for (let i = 1; i < strings.length; i++) {
+    // Find common prefix between current prefix and next string
+    let j = 0;
+    while (j < prefix.length && j < strings[i].length && prefix[j] === strings[i][j]) {
+      j++;
+    }
+    prefix = prefix.substring(0, j);
+    if (prefix === '') break;
+  }
+  
+  return prefix;
+}
+
 function completer(line) {
   const completions = getMatchingCommands(line);
   const hits = completions.filter((c) => c.startsWith(line));
@@ -147,17 +166,27 @@ function completer(line) {
 
   if (hits.length === 1) {
     // If there's only one match, append a space after the autocompleted command
-    return [[hits[0]+' '], line];
+    return [[hits[0] + ' '], line];
   }
 
-  // Show all possibilities for multiple matches
- // console.log(); // Move to a new line
-  //console.log(hits.join('  ')); // Display all options with double spaces between them
+  // Find the common prefix among all matches
+  const commonPrefix = findCommonPrefix(hits);
+  
+  // If we can complete more than what's already typed
+  if (commonPrefix.length > line.length) {
+    return [[commonPrefix], line];
+  }
+  
+  // Otherwise, show all options
+  console.log(); // Move to a new line
+  console.log(hits.join('  ')); // Display all options with double spaces between them
+  
+  // Ring the bell
+  process.stdout.write('\x07');
+  
+  // Redisplay the prompt with the current input
   rl.write(null, {ctrl: true, name: 'u'}); // Clear the line
   rl.write(`$ ${line}`); // Rewrite the prompt and current input
-  
-  // Ring the bell for multiple matches
-  process.stdout.write('\x07');
   
   // Return empty array to prevent readline from modifying the prompt
   return [[], line];
