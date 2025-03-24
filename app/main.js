@@ -151,8 +151,8 @@ function completer(line) {
   }
 
   // Show all possibilities for multiple matches
-  console.log(); // Move to a new line
-  console.log(hits.join('  ')); // Display all options with double spaces between them
+ // console.log(); // Move to a new line
+  //console.log(hits.join('  ')); // Display all options with double spaces between them
   rl.write(null, {ctrl: true, name: 'u'}); // Clear the line
   rl.write(`$ ${line}`); // Rewrite the prompt and current input
   
