@@ -15,7 +15,7 @@ let isFirstTabPress = true;
 
 // Main function to start the shell
 function startShell() {
-  console.log("Simple Shell. Type 'exit 0' to quit.");
+  //console.log("Simple Shell. Type 'exit 0' to quit.");
   promptUser();
 }
 
