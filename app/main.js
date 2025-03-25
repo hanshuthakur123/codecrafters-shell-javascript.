@@ -26,7 +26,7 @@ function checkIfCommandExistsInPath(builtin) {
   return false;
 }
 
-// Modified handleEcho to support stderr redirection
+// Modified handleEcho to support stderr redirection// Modified handleEcho to support stderr redirection and proper quote handling
 function handleEcho(text) {
   const parts = text.split(" ");
   const stderrRedirectIndex = parts.indexOf("2>>");
@@ -41,16 +41,20 @@ function handleEcho(text) {
       fs.mkdirSync(dir, { recursive: true });
     }
     
-    // Echo has no stderr by default, so we just output to stdout
-    let output = echoText;
-    if (echoText.startsWith("'") && echoText.endsWith("'")) {
-      output = echoText.slice(1, -1).replaceAll("'", "");
+    // Handle quoted and unquoted output correctly
+    let output;
+    if (echoText.startsWith('"') && echoText.endsWith('"')) {
+      output = echoText.slice(1, -1); // Remove surrounding double quotes
+    } else if (echoText.startsWith("'") && echoText.endsWith("'")) {
+      output = echoText.slice(1, -1).replaceAll("'", ""); // Remove single quotes and any inner single quotes
+    } else {
+      output = echoText; // No quotes, just use as-is
     }
     console.log(output);
     return;
   }
 
-  // Original echo handling
+  // Original echo handling without redirection
   if (text.startsWith("'") && text.endsWith("'")) {
     const formattedString = text.slice(1, text.length - 1);
     console.log(formattedString.replaceAll("'", ""));
@@ -59,6 +63,7 @@ function handleEcho(text) {
   const formattedString = text.split(" ").filter(t => t !== "").join(" ");
   console.log(formattedString);
 }
+
 
 function handleChangeDirectory(answer) {
   let path = answer.split(" ")[1];
