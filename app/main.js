@@ -1,5 +1,4 @@
 
-
 const execSync = require("child_process").execSync;
 const readline = require("readline");
 const fs = require('node:fs');
@@ -158,10 +157,9 @@ function findCommonPrefix(strings) {
 }
 
 function completer(line) {
-  const allCommands = getMatchingCommands(line);
-  // Use Set to remove duplicates
-  const uniqueCommands = [...new Set(allCommands)];
-  const hits = uniqueCommands.filter((c) => c.startsWith(line));
+  const completions = getMatchingCommands(line);
+  const hits = completions.filter((c) => c.startsWith(line));
+
   if (hits.length === 0) {
     // No matches, return nothing
     return [[], line];
