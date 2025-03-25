@@ -143,11 +143,6 @@ function handleAnswer(answer) {
     rl.close();
     return;
   }
-
-  const parts = answer.split(" ");
-  const stdoutRedirectIndex = parts.indexOf(">>");
-  const stderrRedirectIndex = parts.indexOf("2>>");
-
   if (answer.startsWith("echo ")) {
     const text = answer.replace("echo ", "");
     handleEcho(text);
@@ -160,7 +155,7 @@ function handleAnswer(answer) {
       case "exit":
       case "pwd":
       case "cd":
-        console.log(`${builtin} is a shell builtin`);
+        console.log(`${builtin} is a shell builtin`)
         found = true;
         break;
       default:
@@ -174,13 +169,12 @@ function handleAnswer(answer) {
     console.log(currWorkDir);
   } else if (answer.startsWith("cd ")) {
     handleChangeDirectory(answer);
-  } else if ((stdoutRedirectIndex !== -1 || stderrRedirectIndex !== -1) && !handledExternalProgram(answer)) {
-    console.log(`${program}: command not found`);
   } else if (!handledExternalProgram(answer)) {
     console.log(`${answer}: command not found`);
   }
   repeat();
 }
+
 function repeat() {
   rl.question("$ ", (answer) => {
     handleAnswer(answer);
