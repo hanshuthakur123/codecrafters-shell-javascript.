@@ -89,15 +89,17 @@ function handledExternalProgram(answer) {
     }
   }
 
-  if (foundPath === " ") {
+  if (foundPath === "") {  // Fixed the condition from " " to ""
     return false;
   }
 
-  // Check for redirection
-  let redirectIndex = parts.indexOf(">>");
-  if (redirectIndex !== -1 && redirectIndex < parts.length - 1) {
-    const redirectFile = parts.slice(redirectIndex + 1).join(" ");
-    const commandArgs = parts.slice(1, redirectIndex);
+  // Check for redirection (stdout >> or stderr 2>>)
+  let stdoutRedirectIndex = parts.indexOf(">>");
+  let stderrRedirectIndex = parts.indexOf("2>>");
+  
+  if (stdoutRedirectIndex !== -1 && stdoutRedirectIndex < parts.length - 1) {
+    const redirectFile = parts.slice(stdoutRedirectIndex + 1).join(" ");
+    const commandArgs = parts.slice(1, stdoutRedirectIndex);
     const fullCommand = `${foundPath}/${program} ${commandArgs.join(" ")} >> ${redirectFile}`;
     
     try {
@@ -107,13 +109,13 @@ function handledExternalProgram(answer) {
         fs.mkdirSync(dir, { recursive: true });
       }
 
-      // Execute the command with redirection handled by the shell
+      // Execute the command with stdout redirection handled by the shell
       const result = require("child_process").spawnSync(
         fullCommand,
         [],
         {
           shell: true,
-          stdio: ['pipe', 'inherit', 'pipe'] // inherit stdout to handle redirection, capture stderr
+          stdio: ['pipe', 'inherit', 'pipe'] // inherit stdout for redirection, capture stderr
         }
       );
 
@@ -130,6 +132,44 @@ function handledExternalProgram(answer) {
     } catch (error) {
       if (error.stderr) {
         console.log(error.stderr.toString().trim());
+      }
+      return true;
+    }
+  } else if (stderrRedirectIndex !== -1 && stderrRedirectIndex < parts.length - 1) {
+    const redirectFile = parts.slice(stderrRedirectIndex + 1).join(" ");
+    const commandArgs = parts.slice(1, stderrRedirectIndex);
+    const fullCommand = `${foundPath}/${program} ${commandArgs.join(" ")} 2>> ${redirectFile}`;
+    
+    try {
+      // Ensure the directory exists, create it if it doesn't
+      const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
+      if (dir && !fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      // Execute the command with stderr redirection handled by the shell
+      const result = require("child_process").spawnSync(
+        fullCommand,
+        [],
+        {
+          shell: true,
+          stdio: ['pipe', 'pipe', 'inherit'] // inherit stderr for redirection, capture stdout
+        }
+      );
+
+      // Display stdout to console if there is any
+      if (result.stdout && result.stdout.length > 0) {
+        console.log(result.stdout.toString().trim());
+      }
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      return true;
+    } catch (error) {
+      if (error.stdout) {
+        console.log(error.stdout.toString().trim());
       }
       return true;
     }
