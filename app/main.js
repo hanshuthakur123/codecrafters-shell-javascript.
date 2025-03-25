@@ -165,8 +165,8 @@ function completer(line) {
   
   if (hits.length === 0) {
     // No matches, return nothing
-   
-    return [[[] ,process.stdout.write('\x07')], line];
+    process.stdout.write('\x07');
+    return [[] , line];
     
   }
 
