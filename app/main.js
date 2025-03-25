@@ -165,16 +165,15 @@ function completer(line) {
   
   if (hits.length === 0) {
     // No matches, return nothing
-   // process.stdout.write('\x07');
     return [[], line];
   }
 
  
-  else if (hits.length === 1  && hits[0] === line) {
+  if (hits.length === 1  && hits[0] === line) {
     // If there's only one match, append a space after the autocompleted command
     return [[hits[0]], line];
   }
-   else if (hits.length === 1) {
+  if (hits.length === 1) {
     // If there's only one match, append a space after the autocompleted command
     return [[hits[0]+' '], line];
   }
