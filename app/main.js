@@ -193,7 +193,7 @@ function completer(line) {
   
   // Redisplay the prompt with the current input
   rl.write(null, {ctrl: true, name: 'u'}); // Clear the line
-  rl.write(`$ ${line}`); // Rewrite the prompt and current input
+  rl.write(`${line}`); // Rewrite the prompt and current input
   
   // Return empty array to prevent readline from modifying the prompt
   return [[], line];
