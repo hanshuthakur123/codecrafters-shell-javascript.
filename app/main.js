@@ -158,10 +158,10 @@ function findCommonPrefix(strings) {
 }
 
 function completer(line) {
-  const allCommands = getMatchingCommands(line);
+  const commands = getMatchingCommands(line);
   // Use Set to remove duplicates
-  const uniqueCommands = [...new Set(allCommands)];
-  const hits = uniqueCommands.filter((c) => c.startsWith(line));
+  
+  const hits = commands.filter((c) => c.startsWith(line));
   if (hits.length === 0) {
     // No matches, return nothing
     return [[], line];
@@ -201,15 +201,24 @@ function completer(line) {
 
 function getMatchingCommands(line) {
   const paths = PATH.split(":");
-  let commands = [];
+  // Use a Set to automatically eliminate duplicates
+  const uniqueCommands = new Set();
+  
   for (let path of paths) {
     if (!fs.existsSync(path)) {
       continue;
     }
     const fileNames = fs.readdirSync(path);
-    commands = commands.concat(fileNames);
+    // Only add commands that match the line prefix
+    for (const fileName of fileNames) {
+      if (fileName.startsWith(line)) {
+        uniqueCommands.add(fileName);
+      }
+    }
   }
-  return commands;
+  
+  // Convert Set back to array
+  return Array.from(uniqueCommands);
 }
 
 repeat();
