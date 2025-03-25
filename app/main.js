@@ -98,28 +98,27 @@ function handledExternalProgram(answer) {
   if (redirectIndex !== -1 && redirectIndex < parts.length - 1) {
     const redirectFile = parts.slice(redirectIndex + 1).join(" ");
     const commandArgs = parts.slice(1, redirectIndex);
+    const fullCommand = `${foundPath}/${program} ${commandArgs.join(" ")}`;
     
     try {
-      // Use spawnSync for better control over stdio
+      // Use spawnSync with shell to handle redirection properly
       const result = require("child_process").spawnSync(
-        `${foundPath}/${program}`,
-        commandArgs,
+        fullCommand,
+        [],
         {
-          shell: true, // Enable shell features like redirection
-          stdio: ['pipe', 'pipe', 'pipe'] // Capture all outputs
+          shell: true,
+          stdio: ['pipe', 'pipe', 'pipe']
         }
       );
 
-      // Handle stderr output
-      if (result.stderr && result.stderr.length > 0) {
-        // Append stderr to file
-        fs.appendFileSync(redirectFile, result.stderr);
-        console.log(result.stderr.toString().trim());
-      }
-      
-      // Handle stdout if any
+      // Append stdout to file if there is any
       if (result.stdout && result.stdout.length > 0) {
-        console.log(result.stdout.toString().trim());
+        fs.appendFileSync(redirectFile, result.stdout);
+      }
+
+      // Display stderr to console if there is any
+      if (result.stderr && result.stderr.length > 0) {
+        console.log(result.stderr.toString().trim());
       }
 
       if (result.error) {
@@ -128,8 +127,10 @@ function handledExternalProgram(answer) {
 
       return true;
     } catch (error) {
-      console.error(error.message);
-      return true; // Return true since we handled it, even if it errored
+      if (error.stderr) {
+        console.log(error.stderr.toString().trim());
+      }
+      return true;
     }
   }
 
@@ -143,7 +144,7 @@ function handledExternalProgram(answer) {
     if (error.stderr) {
       console.log(error.stderr.toString().trim());
     }
-    return true; // Return true since we handled it
+    return true;
   }
 }
 
