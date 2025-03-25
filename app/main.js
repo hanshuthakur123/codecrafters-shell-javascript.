@@ -163,6 +163,8 @@ function completer(line) {
   .sort();
   
   if (hits.length === 0) {
+    process.stdout.write('\x07');
+
     // No matches, return nothing
     return [[], line];
   }
