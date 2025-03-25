@@ -159,7 +159,7 @@ function findCommonPrefix(strings) {
 function completer(line) {
   const allCommands = getMatchingCommands(line);
   // Use Set to remove duplicates
-  const uniqueCommands = [...new Set(allCommands)];
+  const uniqueCommands = [...new Set(['echo', 'type', 'exit', 'pwd', 'cd', ...allCommands])]; // Added built-ins
   const hits = uniqueCommands.filter((c) => c.startsWith(line))
   .sort();
   
