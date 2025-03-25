@@ -98,24 +98,23 @@ function handledExternalProgram(answer) {
   if (redirectIndex !== -1 && redirectIndex < parts.length - 1) {
     const redirectFile = parts.slice(redirectIndex + 1).join(" ");
     const commandArgs = parts.slice(1, redirectIndex);
-    const fullCommand = `${foundPath}/${program} ${commandArgs.join(" ")} >> ${redirectFile}`;
+    const fullCommand = `${foundPath}/${program} ${commandArgs.join(" ")}`;
     
     try {
-      // Ensure the directory exists, create it if it doesn't
-      const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
-      if (dir && !fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-
-      // Execute the command with redirection handled by the shell
+      // Use spawnSync with shell to handle redirection properly
       const result = require("child_process").spawnSync(
         fullCommand,
         [],
         {
           shell: true,
-          stdio: ['pipe', 'inherit', 'pipe'] // inherit stdout to handle redirection, capture stderr
+          stdio: ['pipe', 'pipe', 'pipe']
         }
       );
+
+      // Append stdout to file if there is any
+      if (result.stdout && result.stdout.length > 0) {
+        fs.appendFileSync(redirectFile, result.stdout);
+      }
 
       // Display stderr to console if there is any
       if (result.stderr && result.stderr.length > 0) {
