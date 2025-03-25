@@ -26,7 +26,31 @@ function checkIfCommandExistsInPath(builtin) {
   return false;
 }
 
+// Modified handleEcho to support stderr redirection
 function handleEcho(text) {
+  const parts = text.split(" ");
+  const stderrRedirectIndex = parts.indexOf("2>>");
+  
+  if (stderrRedirectIndex !== -1 && stderrRedirectIndex < parts.length - 1) {
+    const redirectFile = parts.slice(stderrRedirectIndex + 1).join(" ");
+    const echoText = parts.slice(0, stderrRedirectIndex).join(" ");
+    
+    // Ensure directory exists
+    const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
+    if (dir && !fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    // Echo has no stderr by default, so we just output to stdout
+    let output = echoText;
+    if (echoText.startsWith("'") && echoText.endsWith("'")) {
+      output = echoText.slice(1, -1).replaceAll("'", "");
+    }
+    console.log(output);
+    return;
+  }
+
+  // Original echo handling
   if (text.startsWith("'") && text.endsWith("'")) {
     const formattedString = text.slice(1, text.length - 1);
     console.log(formattedString.replaceAll("'", ""));
@@ -77,7 +101,6 @@ function handledExternalProgram(answer) {
   const parts = answer.split(" ");
   const program = parts[0];
   
-  // Find the program in PATH
   for (let path of paths) {
     if (!fs.existsSync(path)) {
       continue;
@@ -89,97 +112,24 @@ function handledExternalProgram(answer) {
     }
   }
 
-  if (foundPath === "") {  // Fixed the condition from " " to ""
+  if (foundPath === "") {
     return false;
   }
 
-  // Check for redirection (stdout >> or stderr 2>>)
-  let stdoutRedirectIndex = parts.indexOf(">>");
-  let stderrRedirectIndex = parts.indexOf("2>>");
-  
-  if (stdoutRedirectIndex !== -1 && stdoutRedirectIndex < parts.length - 1) {
-    const redirectFile = parts.slice(stdoutRedirectIndex + 1).join(" ");
-    const commandArgs = parts.slice(1, stdoutRedirectIndex);
-    const fullCommand = `${foundPath}/${program} ${commandArgs.join(" ")} >> ${redirectFile}`;
-    
-    try {
-      // Ensure the directory exists, create it if it doesn't
-      const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
-      if (dir && !fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-
-      // Execute the command with stdout redirection handled by the shell
-      const result = require("child_process").spawnSync(
-        fullCommand,
-        [],
-        {
-          shell: true,
-          stdio: ['pipe', 'inherit', 'pipe'] // inherit stdout for redirection, capture stderr
-        }
-      );
-
-      // Display stderr to console if there is any
-      if (result.stderr && result.stderr.length > 0) {
-        console.log(result.stderr.toString().trim());
-      }
-
-      if (result.error) {
-        throw result.error;
-      }
-
-      return true;
-    } catch (error) {
-      if (error.stderr) {
-        console.log(error.stderr.toString().trim());
-      }
-      return true;
-    }
-  } else if (stderrRedirectIndex !== -1 && stderrRedirectIndex < parts.length - 1) {
-    const redirectFile = parts.slice(stderrRedirectIndex + 1).join(" ");
-    const commandArgs = parts.slice(1, stderrRedirectIndex);
-    const fullCommand = `${foundPath}/${program} ${commandArgs.join(" ")} 2>> ${redirectFile}`;
-    
-    try {
-      // Ensure the directory exists, create it if it doesn't
-      const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
-      if (dir && !fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-
-      // Execute the command with stderr redirection handled by the shell
-      const result = require("child_process").spawnSync(
-        fullCommand,
-        [],
-        {
-          shell: true,
-          stdio: ['pipe', 'pipe', 'inherit'] // inherit stderr for redirection, capture stdout
-        }
-      );
-
-      // Display stdout to console if there is any
-      if (result.stdout && result.stdout.length > 0) {
-        console.log(result.stdout.toString().trim());
-      }
-
-      if (result.error) {
-        throw result.error;
-      }
-
-      return true;
-    } catch (error) {
-      if (error.stdout) {
-        console.log(error.stdout.toString().trim());
-      }
-      return true;
-    }
-  }
-
-  // Original execution path for commands without redirection
   try {
-    const output = execSync(answer);
-    const outputString = output.toString();
-    console.log(outputString.trim());
+    const result = require("child_process").spawnSync(
+      answer,  // Pass the full command including redirection
+      [],
+      {
+        shell: true,
+        stdio: ['pipe', 'inherit', 'inherit'] // Let shell handle all redirections
+      }
+    );
+
+    if (result.error) {
+      throw result.error;
+    }
+
     return true;
   } catch (error) {
     if (error.stderr) {
@@ -188,12 +138,16 @@ function handledExternalProgram(answer) {
     return true;
   }
 }
-
 function handleAnswer(answer) {
   if (answer === "exit 0") {
     rl.close();
     return;
   }
+
+  const parts = answer.split(" ");
+  const stdoutRedirectIndex = parts.indexOf(">>");
+  const stderrRedirectIndex = parts.indexOf("2>>");
+
   if (answer.startsWith("echo ")) {
     const text = answer.replace("echo ", "");
     handleEcho(text);
@@ -206,7 +160,7 @@ function handleAnswer(answer) {
       case "exit":
       case "pwd":
       case "cd":
-        console.log(`${builtin} is a shell builtin`)
+        console.log(`${builtin} is a shell builtin`);
         found = true;
         break;
       default:
@@ -220,12 +174,13 @@ function handleAnswer(answer) {
     console.log(currWorkDir);
   } else if (answer.startsWith("cd ")) {
     handleChangeDirectory(answer);
+  } else if ((stdoutRedirectIndex !== -1 || stderrRedirectIndex !== -1) && !handledExternalProgram(answer)) {
+    console.log(`${program}: command not found`);
   } else if (!handledExternalProgram(answer)) {
     console.log(`${answer}: command not found`);
   }
   repeat();
 }
-
 function repeat() {
   rl.question("$ ", (answer) => {
     handleAnswer(answer);
