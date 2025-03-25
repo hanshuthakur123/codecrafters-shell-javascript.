@@ -89,7 +89,7 @@ function handledExternalProgram(answer) {
     }
   }
 
-  if (foundPath === "") {
+  if (foundPath === "$") {
     return false;
   }
 
