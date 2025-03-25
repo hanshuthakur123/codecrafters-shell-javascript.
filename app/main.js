@@ -1,3 +1,4 @@
+
 const execSync = require("child_process").execSync;
 const readline = require("readline");
 const fs = require('node:fs');
@@ -163,8 +164,8 @@ function completer(line) {
   .sort();
   
   if (hits.length === 0) {
-    
     // No matches, return nothing
+    process.stdout.write('\x07');
     return [[], line];
   }
 
