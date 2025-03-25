@@ -189,11 +189,11 @@ function completer(line) {
   console.log(hits.join('  ')); // Display all options with double spaces between them
   
   // Ring the bell
-  process.stdout.write('\x07');
-  
+ 
   // Redisplay the prompt with the current input
   rl.write(null, {ctrl: true, name: 'u'}); // Clear the line
   rl.write(`${line}`); // Rewrite the prompt and current input
+  process.stdout.write('\x07');
   
   // Return empty array to prevent readline from modifying the prompt
   return [[], line];
