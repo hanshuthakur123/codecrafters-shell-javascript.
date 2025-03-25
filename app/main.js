@@ -89,7 +89,7 @@ function handledExternalProgram(answer) {
     }
   }
 
-  if (foundPath === "") {
+  if (foundPath === " ") {
     return false;
   }
 
@@ -98,23 +98,24 @@ function handledExternalProgram(answer) {
   if (redirectIndex !== -1 && redirectIndex < parts.length - 1) {
     const redirectFile = parts.slice(redirectIndex + 1).join(" ");
     const commandArgs = parts.slice(1, redirectIndex);
-    const fullCommand = `${foundPath}/${program} ${commandArgs.join(" ")}`;
+    const fullCommand = `${foundPath}/${program} ${commandArgs.join(" ")} >> ${redirectFile}`;
     
     try {
-      // Use spawnSync with shell to handle redirection properly
+      // Ensure the directory exists, create it if it doesn't
+      const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
+      if (dir && !fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      // Execute the command with redirection handled by the shell
       const result = require("child_process").spawnSync(
         fullCommand,
         [],
         {
           shell: true,
-          stdio: ['pipe', 'pipe', 'pipe']
+          stdio: ['pipe', 'inherit', 'pipe'] // inherit stdout to handle redirection, capture stderr
         }
       );
-
-      // Append stdout to file if there is any
-      if (result.stdout && result.stdout.length > 0) {
-        fs.appendFileSync(redirectFile, result.stdout);
-      }
 
       // Display stderr to console if there is any
       if (result.stderr && result.stderr.length > 0) {
