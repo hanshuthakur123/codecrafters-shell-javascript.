@@ -74,7 +74,10 @@ function handleChangeDirectory(answer) {
 function handledExternalProgram(answer) {
   const paths = PATH.split(":");
   let foundPath = "";
-  const program = answer.split(" ")[0];
+  const parts = answer.split(" ");
+  const program = parts[0];
+  
+  // Find the program in PATH
   for (let path of paths) {
     if (!fs.existsSync(path)) {
       continue;
@@ -85,13 +88,63 @@ function handledExternalProgram(answer) {
       break;
     }
   }
-  if (foundPath !== "") {
+
+  if (foundPath === "") {
+    return false;
+  }
+
+  // Check for redirection
+  let redirectIndex = parts.indexOf(">>");
+  if (redirectIndex !== -1 && redirectIndex < parts.length - 1) {
+    const redirectFile = parts.slice(redirectIndex + 1).join(" ");
+    const commandArgs = parts.slice(1, redirectIndex);
+    
+    try {
+      // Use spawnSync for better control over stdio
+      const result = require("child_process").spawnSync(
+        `${foundPath}/${program}`,
+        commandArgs,
+        {
+          shell: true, // Enable shell features like redirection
+          stdio: ['pipe', 'pipe', 'pipe'] // Capture all outputs
+        }
+      );
+
+      // Handle stderr output
+      if (result.stderr && result.stderr.length > 0) {
+        // Append stderr to file
+        fs.appendFileSync(redirectFile, result.stderr);
+        console.log(result.stderr.toString().trim());
+      }
+      
+      // Handle stdout if any
+      if (result.stdout && result.stdout.length > 0) {
+        console.log(result.stdout.toString().trim());
+      }
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(error.message);
+      return true; // Return true since we handled it, even if it errored
+    }
+  }
+
+  // Original execution path for commands without redirection
+  try {
     const output = execSync(answer);
     const outputString = output.toString();
-    console.log(outputString.slice(0, output.length - 1))
+    console.log(outputString.trim());
     return true;
+  } catch (error) {
+    if (error.stderr) {
+      console.log(error.stderr.toString().trim());
+    }
+    return true; // Return true since we handled it
   }
-  return false;
 }
 
 function handleAnswer(answer) {
