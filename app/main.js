@@ -101,17 +101,6 @@ function handledExternalProgram(answer) {
     const fullCommand = `${foundPath}/${program} ${commandArgs.join(" ")}`;
     
     try {
-      // Ensure the directory exists, create it if it doesn't
-      const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
-      if (dir && !fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      
-      // Ensure the file exists (create empty if it doesn't)
-      if (!fs.existsSync(redirectFile)) {
-        fs.writeFileSync(redirectFile, "");
-      }
-
       // Use spawnSync with shell to handle redirection properly
       const result = require("child_process").spawnSync(
         fullCommand,
@@ -158,6 +147,7 @@ function handledExternalProgram(answer) {
     return true;
   }
 }
+
 function handleAnswer(answer) {
   if (answer === "exit 0") {
     rl.close();
