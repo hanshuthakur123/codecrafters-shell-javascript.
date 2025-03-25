@@ -1,4 +1,3 @@
-
 const execSync = require("child_process").execSync;
 const readline = require("readline");
 const fs = require('node:fs');
@@ -157,11 +156,9 @@ function findCommonPrefix(strings) {
 }
 
 function completer(line) {
-  const allCommands = getMatchingCommands(line);
-  // Use Set to remove duplicates
-  const uniqueCommands = [...new Set(allCommands)];
-  const hits = uniqueCommands.filter((c) => c.startsWith(line));
-  
+  const completions = getMatchingCommands(line);
+  const hits = completions.filter((c) => c.startsWith(line));
+
   if (hits.length === 0) {
     // No matches, return nothing
     return [[], line];
@@ -174,7 +171,7 @@ function completer(line) {
   }
   if (hits.length === 1) {
     // If there's only one match, append a space after the autocompleted command
-    return [[hits[0]+' '], line];
+    return [[hits[0]+' ' ], line];
   }
   // Find the common prefix among all matches
   const commonPrefix = findCommonPrefix(hits);
@@ -193,7 +190,7 @@ function completer(line) {
   
   // Redisplay the prompt with the current input
   rl.write(null, {ctrl: true, name: 'u'}); // Clear the line
-  rl.write(`${line}`); // Rewrite the prompt and current input
+  rl.write(`$ ${line}`); // Rewrite the prompt and current input
   
   // Return empty array to prevent readline from modifying the prompt
   return [[], line];
