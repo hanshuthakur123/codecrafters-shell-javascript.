@@ -27,39 +27,10 @@ function checkIfCommandExistsInPath(builtin) {
 }
 
 // Modified handleEcho to support stderr redirection// Modified handleEcho to support stderr redirection and proper quote handling
-// Modified handleEcho to support both stdout (1>>) and stderr (2>>) redirection
 function handleEcho(text) {
   const parts = text.split(" ");
   const stderrRedirectIndex = parts.indexOf("2>>");
-  const stdoutRedirectIndex = parts.indexOf("1>>");
   
-  // Handle stdout redirection (1>>)
-  if (stdoutRedirectIndex !== -1 && stdoutRedirectIndex < parts.length - 1) {
-    const redirectFile = parts.slice(stdoutRedirectIndex + 1).join(" ");
-    const echoText = parts.slice(0, stdoutRedirectIndex).join(" ");
-    
-    // Ensure directory exists
-    const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
-    if (dir && !fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    
-    // Handle quoted and unquoted output correctly
-    let output;
-    if (echoText.startsWith('"') && echoText.endsWith('"')) {
-      output = echoText.slice(1, -1); // Remove surrounding double quotes
-    } else if (echoText.startsWith("'") && echoText.endsWith("'")) {
-      output = echoText.slice(1, -1).replaceAll("'", ""); // Remove single quotes and inner quotes
-    } else {
-      output = echoText; // No quotes, just use as-is
-    }
-    
-    // Append output to file instead of console
-    fs.appendFileSync(redirectFile, output + "\n"); // Add newline like echo does
-    return;
-  }
-  
-  // Handle stderr redirection (2>>)
   if (stderrRedirectIndex !== -1 && stderrRedirectIndex < parts.length - 1) {
     const redirectFile = parts.slice(stderrRedirectIndex + 1).join(" ");
     const echoText = parts.slice(0, stderrRedirectIndex).join(" ");
@@ -73,13 +44,13 @@ function handleEcho(text) {
     // Handle quoted and unquoted output correctly
     let output;
     if (echoText.startsWith('"') && echoText.endsWith('"')) {
-      output = echoText.slice(1, -1);
+      output = echoText.slice(1, -1); // Remove surrounding double quotes
     } else if (echoText.startsWith("'") && echoText.endsWith("'")) {
-      output = echoText.slice(1, -1).replaceAll("'", "");
+      output = echoText.slice(1, -1).replaceAll("'", ""); // Remove single quotes and any inner single quotes
     } else {
-      output = echoText;
+      output = echoText; // No quotes, just use as-is
     }
-    console.log(output); // Echo has no stderr, so output goes to stdout
+    console.log(output);
     return;
   }
 
@@ -92,6 +63,8 @@ function handleEcho(text) {
   const formattedString = text.split(" ").filter(t => t !== "").join(" ");
   console.log(formattedString);
 }
+
+
 function handleChangeDirectory(answer) {
   let path = answer.split(" ")[1];
   if (path === "~") {
