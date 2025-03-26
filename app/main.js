@@ -180,7 +180,6 @@ function handleAnswer(answer) {
   if (answer.startsWith("echo ")) {
     const text = answer.replace("echo ", "");
     handleEcho(text);
-    return; // Ensure we return after handling echo to prevent fall-through
   } else if (answer.startsWith("type ")) {
     const builtin = answer.replace("type ", "");
     let found = false;
