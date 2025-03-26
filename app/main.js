@@ -27,9 +27,37 @@ function checkIfCommandExistsInPath(builtin) {
 }
 function handleEcho(text) {
   const parts = text.trim().split(" ");
+  const stderrOverwriteIndex = parts.indexOf("2>");
   const stderrRedirectIndex = parts.indexOf("2>>");
   const stdoutAppendIndex = parts.indexOf("1>>");
   const stdoutOverwriteIndex = parts.indexOf(">");
+  // Handle stderr overwrite redirection (2>)
+  if (stderrOverwriteIndex !== -1 && stderrOverwriteIndex < parts.length - 1) {
+    const redirectFile = parts.slice(stderrOverwriteIndex + 1).join(" ");
+    const echoText = parts.slice(0, stderrOverwriteIndex).join(" ");
+    
+    // Ensure directory exists
+    const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
+    if (dir && !fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    // Handle quoted and unquoted output correctly
+    let output;
+    if (echoText.startsWith('"') && echoText.endsWith('"')) {
+      output = echoText.slice(1, -1);
+    } else if (echoText.startsWith("'") && echoText.endsWith("'")) {
+      output = echoText.slice(1, -1).replaceAll("'", "");
+    } else {
+      output = echoText;
+    }
+    
+    // Echo has no stderr, so overwrite file with empty content, but output to stdout
+    fs.writeFileSync(redirectFile, ""); // Overwrite with empty string since no stderr
+    console.log(output);
+    return;
+  }
+
   
   // Handle stdout overwrite redirection (>)
   if (stdoutOverwriteIndex !== -1 && stdoutOverwriteIndex < parts.length - 1) {
