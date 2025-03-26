@@ -24,17 +24,19 @@ function checkIfCommandExistsInPath(builtin) {
     }
   }
   return false;
-}function handleEcho(text) {
+}
+function handleEcho(text) {
   const parts = text.trim().split(" ");
   const stderrOverwriteIndex = parts.indexOf("2>");
   const stderrAppendIndex = parts.indexOf("2>>");
   const stdoutAppendIndex = parts.indexOf("1>>");
   const stdoutOverwriteIndex = parts.indexOf(">");
+  const stdoutExplicitOverwriteIndex = parts.indexOf("1>");
   
-  // Handle stderr overwrite redirection (2>)
-  if (stderrOverwriteIndex !== -1 && stderrOverwriteIndex < parts.length - 1) {
-    const redirectFile = parts.slice(stderrOverwriteIndex + 1).join(" ");
-    const echoText = parts.slice(0, stderrOverwriteIndex).join(" ");
+  // Handle stdout explicit overwrite redirection (1>)
+  if (stdoutExplicitOverwriteIndex !== -1 && stdoutExplicitOverwriteIndex < parts.length - 1) {
+    const redirectFile = parts.slice(stdoutExplicitOverwriteIndex + 1).join(" ");
+    const echoText = parts.slice(0, stdoutExplicitOverwriteIndex).join(" ");
     
     // Ensure directory exists
     const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
@@ -52,8 +54,31 @@ function checkIfCommandExistsInPath(builtin) {
       output = echoText;
     }
     
-    // Echo has no stderr, so overwrite file with empty content, but output to stdout
-    fs.writeFileSync(redirectFile, ""); // Overwrite with empty string since no stderr
+    // Overwrite file with output
+    fs.writeFileSync(redirectFile, output + "\n");
+    return;
+  }
+  
+  // Handle stderr overwrite redirection (2>)
+  if (stderrOverwriteIndex !== -1 && stderrOverwriteIndex < parts.length - 1) {
+    const redirectFile = parts.slice(stderrOverwriteIndex + 1).join(" ");
+    const echoText = parts.slice(0, stderrOverwriteIndex).join(" ");
+    
+    const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
+    if (dir && !fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    let output;
+    if (echoText.startsWith('"') && echoText.endsWith('"')) {
+      output = echoText.slice(1, -1);
+    } else if (echoText.startsWith("'") && echoText.endsWith("'")) {
+      output = echoText.slice(1, -1).replaceAll("'", "");
+    } else {
+      output = echoText;
+    }
+    
+    fs.writeFileSync(redirectFile, ""); // Echo has no stderr
     console.log(output);
     return;
   }
@@ -122,7 +147,7 @@ function checkIfCommandExistsInPath(builtin) {
     } else {
       output = echoText;
     }
-    console.log(output); // Echo has no stderr, so output goes to stdout
+    console.log(output); // Echo has no stderr
     return;
   }
 
