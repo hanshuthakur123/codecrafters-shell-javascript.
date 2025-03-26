@@ -7,7 +7,7 @@ const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
   prompt: "$ ",
-  completer: completer
+  
 });
 const CMDS = ["type", "echo", "exit", "pwd"];
 rl.prompt();
@@ -17,7 +17,6 @@ rl.on("line", (input) => {
     rl.prompt();
   });
 })
-
 function execCmd(command, callback) {
   const { cmd, args } = getCmd(command)
   if (cmd === "exit" && args[0] === "0") {
