@@ -25,18 +25,16 @@ function checkIfCommandExistsInPath(builtin) {
   }
   return false;
 }
-
-// Modified handleEcho to support stderr redirection// Modified handleEcho to support stderr redirection and proper quote handling
-// Modified handleEcho to ensure proper handling of 1>> and 2>>
 function handleEcho(text) {
-  const parts = text.trim().split(" "); // Ensure no leading/trailing spaces affect parsing
+  const parts = text.trim().split(" ");
   const stderrRedirectIndex = parts.indexOf("2>>");
-  const stdoutRedirectIndex = parts.indexOf("1>>");
+  const stdoutAppendIndex = parts.indexOf("1>>");
+  const stdoutOverwriteIndex = parts.indexOf(">");
   
-  // Handle stdout redirection (1>>)
-  if (stdoutRedirectIndex !== -1 && stdoutRedirectIndex < parts.length - 1) {
-    const redirectFile = parts.slice(stdoutRedirectIndex + 1).join(" ");
-    const echoText = parts.slice(0, stdoutRedirectIndex).join(" ");
+  // Handle stdout overwrite redirection (>)
+  if (stdoutOverwriteIndex !== -1 && stdoutOverwriteIndex < parts.length - 1) {
+    const redirectFile = parts.slice(stdoutOverwriteIndex + 1).join(" ");
+    const echoText = parts.slice(0, stdoutOverwriteIndex).join(" ");
     
     // Ensure directory exists
     const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
@@ -54,12 +52,38 @@ function handleEcho(text) {
       output = echoText; // No quotes, just use as-is
     }
     
-    // Append output to file instead of console
-    fs.appendFileSync(redirectFile, output + "\n"); // Add newline like echo does
+    // Overwrite file with output
+    fs.writeFileSync(redirectFile, output + "\n"); // Overwrite instead of append
     return;
   }
   
-  // Handle stderr redirection (2>>)
+  // Handle stdout append redirection (1>>)
+  if (stdoutAppendIndex !== -1 && stdoutAppendIndex < parts.length - 1) {
+    const redirectFile = parts.slice(stdoutAppendIndex + 1).join(" ");
+    const echoText = parts.slice(0, stdoutAppendIndex).join(" ");
+    
+    // Ensure directory exists
+    const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
+    if (dir && !fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    // Handle quoted and unquoted output correctly
+    let output;
+    if (echoText.startsWith('"') && echoText.endsWith('"')) {
+      output = echoText.slice(1, -1);
+    } else if (echoText.startsWith("'") && echoText.endsWith("'")) {
+      output = echoText.slice(1, -1).replaceAll("'", "");
+    } else {
+      output = echoText;
+    }
+    
+    // Append output to file
+    fs.appendFileSync(redirectFile, output + "\n");
+    return;
+  }
+  
+  // Handle stderr append redirection (2>>)
   if (stderrRedirectIndex !== -1 && stderrRedirectIndex < parts.length - 1) {
     const redirectFile = parts.slice(stderrRedirectIndex + 1).join(" ");
     const echoText = parts.slice(0, stderrRedirectIndex).join(" ");
@@ -92,7 +116,6 @@ function handleEcho(text) {
   const formattedString = text.split(" ").filter(t => t !== "").join(" ");
   console.log(formattedString);
 }
-
 function handleChangeDirectory(answer) {
   let path = answer.split(" ")[1];
   if (path === "~") {
@@ -172,6 +195,7 @@ function handledExternalProgram(answer) {
   }
 }
 // Updated handleAnswer to ensure proper routing
+// Updated handleAnswer remains the same as it correctly routes to handleEcho
 function handleAnswer(answer) {
   if (answer === "exit 0") {
     rl.close();
@@ -180,6 +204,7 @@ function handleAnswer(answer) {
   if (answer.startsWith("echo ")) {
     const text = answer.replace("echo ", "");
     handleEcho(text);
+    return; // Ensure we return after handling echo
   } else if (answer.startsWith("type ")) {
     const builtin = answer.replace("type ", "");
     let found = false;
