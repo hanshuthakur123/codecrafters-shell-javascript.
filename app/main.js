@@ -24,13 +24,13 @@ function checkIfCommandExistsInPath(builtin) {
     }
   }
   return false;
-}function handleEcho(text) {
+}
+function handleEcho(text) {
   const parts = text.trim().split(" ");
   const stderrOverwriteIndex = parts.indexOf("2>");
-  const stderrAppendIndex = parts.indexOf("2>>");
+  const stderrRedirectIndex = parts.indexOf("2>>");
   const stdoutAppendIndex = parts.indexOf("1>>");
   const stdoutOverwriteIndex = parts.indexOf(">");
-  
   // Handle stderr overwrite redirection (2>)
   if (stderrOverwriteIndex !== -1 && stderrOverwriteIndex < parts.length - 1) {
     const redirectFile = parts.slice(stderrOverwriteIndex + 1).join(" ");
@@ -57,27 +57,31 @@ function checkIfCommandExistsInPath(builtin) {
     console.log(output);
     return;
   }
+
   
   // Handle stdout overwrite redirection (>)
   if (stdoutOverwriteIndex !== -1 && stdoutOverwriteIndex < parts.length - 1) {
     const redirectFile = parts.slice(stdoutOverwriteIndex + 1).join(" ");
     const echoText = parts.slice(0, stdoutOverwriteIndex).join(" ");
     
+    // Ensure directory exists
     const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
     if (dir && !fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     
+    // Handle quoted and unquoted output correctly
     let output;
     if (echoText.startsWith('"') && echoText.endsWith('"')) {
-      output = echoText.slice(1, -1);
+      output = echoText.slice(1, -1); // Remove surrounding double quotes
     } else if (echoText.startsWith("'") && echoText.endsWith("'")) {
-      output = echoText.slice(1, -1).replaceAll("'", "");
+      output = echoText.slice(1, -1).replaceAll("'", ""); // Remove single quotes and inner quotes
     } else {
-      output = echoText;
+      output = echoText; // No quotes, just use as-is
     }
     
-    fs.writeFileSync(redirectFile, output + "\n");
+    // Overwrite file with output
+    fs.writeFileSync(redirectFile, output + "\n"); // Overwrite instead of append
     return;
   }
   
@@ -86,11 +90,13 @@ function checkIfCommandExistsInPath(builtin) {
     const redirectFile = parts.slice(stdoutAppendIndex + 1).join(" ");
     const echoText = parts.slice(0, stdoutAppendIndex).join(" ");
     
+    // Ensure directory exists
     const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
     if (dir && !fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     
+    // Handle quoted and unquoted output correctly
     let output;
     if (echoText.startsWith('"') && echoText.endsWith('"')) {
       output = echoText.slice(1, -1);
@@ -100,20 +106,23 @@ function checkIfCommandExistsInPath(builtin) {
       output = echoText;
     }
     
+    // Append output to file
     fs.appendFileSync(redirectFile, output + "\n");
     return;
   }
   
   // Handle stderr append redirection (2>>)
-  if (stderrAppendIndex !== -1 && stderrAppendIndex < parts.length - 1) {
-    const redirectFile = parts.slice(stderrAppendIndex + 1).join(" ");
-    const echoText = parts.slice(0, stderrAppendIndex).join(" ");
+  if (stderrRedirectIndex !== -1 && stderrRedirectIndex < parts.length - 1) {
+    const redirectFile = parts.slice(stderrRedirectIndex + 1).join(" ");
+    const echoText = parts.slice(0, stderrRedirectIndex).join(" ");
     
+    // Ensure directory exists
     const dir = redirectFile.substring(0, redirectFile.lastIndexOf("/"));
     if (dir && !fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     
+    // Handle quoted and unquoted output correctly
     let output;
     if (echoText.startsWith('"') && echoText.endsWith('"')) {
       output = echoText.slice(1, -1);
