@@ -195,7 +195,6 @@ function handledExternalProgram(answer) {
   }
 }
 // Updated handleAnswer to ensure proper routing
-// Updated handleAnswer remains the same as it correctly routes to handleEcho
 function handleAnswer(answer) {
   if (answer === "exit 0") {
     rl.close();
@@ -204,7 +203,6 @@ function handleAnswer(answer) {
   if (answer.startsWith("echo ")) {
     const text = answer.replace("echo ", "");
     handleEcho(text);
-    return; // Ensure we return after handling echo
   } else if (answer.startsWith("type ")) {
     const builtin = answer.replace("type ", "");
     let found = false;
