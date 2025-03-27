@@ -12,6 +12,9 @@ const rl = readline.createInterface({
   prompt: "$ ",
   completer: completer // Add completer function for autocompletion
 });
+const PATH = process.env.PATH;
+const splitCurrDir = __dirname.split("/");
+let currWorkDir = `/${splitCurrDir[splitCurrDir.length - 1]}`;
 
 rl.prompt();
 
