@@ -21,31 +21,52 @@ rl.on("line", (input) => {
     rl.prompt();
   });
 });
-
-// Autocompletion function
 function completer(line) {
-  const input = line.trim();
-  const allCommands = [...CMDS, ...getExternalCommands()];
-  const hits = allCommands.filter((c) => c.startsWith(input)).sort();
-
-  if (hits.length === 0) {
-    return [[], line]; // No matches
+    const allCommands = getMatchingCommands(line);
+    // Use Set to remove duplicates
+    const uniqueCommands = [...new Set(['echo', 'type', 'exit', 'pwd', 'cd', ...allCommands])]; // Added built-ins
+    const hits = uniqueCommands.filter((c) => c.startsWith(line))
+    .sort();
+    
+    if (hits.length === 0) {
+      // No matches, return nothing
+      process.stdout.write('\x07');
+      return [[] , line];
+      
+    }
+  
+   
+    if (hits.length === 1  && hits[0] === line) {
+      // If there's only one match, append a space after the autocompleted command
+      return [[hits[0]], line];
+    }
+    if (hits.length === 1) {
+      // If there's only one match, append a space after the autocompleted command
+      return [[hits[0]+' '], line];
+    }
+    // Find the common prefix among all matches
+    const commonPrefix = findCommonPrefix(hits);
+    
+    // If we can complete more than what's already typed
+    if (commonPrefix.length > line.length) {
+      return [[commonPrefix], line];
+    }
+    
+    // Otherwise, show all options
+    console.log(); // Move to a new line
+    console.log(hits.join('  ')); // Display all options with double spaces between them
+    
+    // Ring the bell
+    process.stdout.write('\x07');
+    
+    // Redisplay the prompt with the current input
+    rl.write(null, {ctrl: true, name: 'u'}); // Clear the line
+    rl.write(`${line}`); // Rewrite the prompt and current input
+   
+    // Return empty array to prevent readline from modifying the prompt
+    return [[], line];
   }
-
-  if (hits.length === 1) {
-    return [[hits[0] + " "], line]; // Single match, add space
-  }
-
-  // Multiple matches, find common prefix
-  const commonPrefix = findCommonPrefix(hits);
-  if (commonPrefix && commonPrefix.length > input.length) {
-    return [[commonPrefix], line]; // Partial completion to common prefix
-  }
-
-  // If no further completion possible, return all matches
-  return [hits, line];
-}
-
+  
 // Find common prefix among an array of strings
 function findCommonPrefix(strings) {
   if (strings.length === 0) return "";
