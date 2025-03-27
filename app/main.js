@@ -119,10 +119,7 @@ const { exit, cwd, chdir } = require("process");
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
+
 const builtins = ["exit", "type", "echo", "pwd"];
 // ✅ Function to find command type (builtin or external)
 function findType(command) {
