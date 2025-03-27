@@ -114,4 +114,139 @@ function printType(cmdName) {
   if (!found) {
     console.log(`${cmdName}: not found`);
   }
+}const readline = require("readline");
+const { exit, cwd, chdir } = require("process");
+const fs = require("fs");
+const path = require("path");
+const { execFileSync } = require("child_process");
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+const builtins = ["exit", "type", "echo", "pwd"];
+// ✅ Function to find command type (builtin or external)
+function findType(command) {
+  let found = false;
+  if (builtins.includes(command)) {
+    console.log(`${command} is a shell builtin`);
+    found = true;
+  } else {
+    const paths = process.env.PATH.split(path.delimiter);
+    for (let p of paths) {
+      const fullPath = path.join(p, command);
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+        console.log(`${command} is ${fullPath}`);
+        found = true;
+        break; // ✅ Stop after finding the first match
+      }
+    }
+  }
+  if (!found) {
+    console.log(`${command}: not found`);
+  }
 }
+// ✅ Function to handle external commands
+function handleExternalCommand(command, args) {
+  const paths = process.env.PATH.split(path.delimiter);
+  for (let pathEnv of paths) {
+    const destPath = path.join(pathEnv, command);
+    if (fs.existsSync(destPath) && fs.statSync(destPath).isFile()) {
+      try {
+        // ✅ Execute the external command with arguments
+        execFileSync(command, args, { stdio: "inherit" });
+      } catch (err) {
+        console.error(`Error executing ${command}: ${err.message}`);
+      }
+      return; // ✅ Stop after executing the command
+    }
+  }
+  console.log(`${command}: command not found`); // ✅ Error if command not found
+}
+// ✅ Function to change the directory
+function changeDirectory (path) {
+  if (path === "~") {
+    path = process.env.HOME;
+  }
+  if (fs.existsSync(path) && fs.statSync(path).isDirectory()) {
+    chdir(path);
+  } else {
+    console.log(`cd: ${path}: No such file or directory`);
+  }
+}
+// ✅ Function to parse the input
+function parseInput(answer) {
+  answer = answer.trim();
+  let tokens = [];
+  let current = '';
+  let isSingleQuote = false; 
+  let isDoubleQuote = false; 
+  for (let i = 0; i < answer.length; i++) {  
+    const char = answer[i];
+    if (isSingleQuote) {
+      if (char === "'") {
+        isSingleQuote = false;  
+      } else {
+        current += char;
+      }
+    } else if (isDoubleQuote) {
+      if (char === '"') {
+        isDoubleQuote = false;
+      } else {
+        current += char;
+      }
+    } else {
+      if (char === "'") {
+        isSingleQuote = true;  
+      } else if (char === '"') {
+        isDoubleQuote = true;
+      } else if (char === " ") {
+        if (current.length > 0) {
+          tokens.push(current);  
+          current = '';
+        }
+        while (answer[i + 1] === " ") i++;
+      } else {
+        current += char;
+      }
+    }
+  }
+  if (current.length > 0) {
+    tokens.push(current);  // ✅ Push remaining token
+  }
+  return tokens;
+}
+// ✅ Main prompt loop
+function prompt() {
+  rl.question("$ ", (answer) => {
+    const parts = parseInput(answer);
+    const command = parts[0];
+    const args = parts.slice(1);
+    // ✅ Built-in: exit
+    if (command === "exit" && args[0] === "0") {
+      exit(0);
+    }
+    // ✅ Built-in: echo
+    else if (command === "echo") {
+      console.log(args.join(" "));
+    }
+    // ✅ Built-in: type
+    else if (command === "type") {
+      findType(args[0]);
+    }
+    // ✅ Print working directory
+    else if (command === "pwd") {
+      console.log(cwd());
+    }
+    // ✅ change directory
+    else if (command === "cd") {
+      changeDirectory(args[0])
+    }
+    // ✅ External commands
+    else {
+      handleExternalCommand(command, args);
+    }
+    // ✅ Continue prompting
+    prompt();
+  });
+}
+prompt();
