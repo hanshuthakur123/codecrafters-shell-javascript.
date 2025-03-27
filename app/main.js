@@ -21,8 +21,6 @@ rl.on("line", (input) => {
     rl.prompt();
   });
 });
-
-// Autocompletion function
 function completer(line) {
   const input = line.trim();
   const allCommands = [...CMDS, ...getExternalCommands()];
@@ -45,7 +43,6 @@ function completer(line) {
   // If no further completion possible, return all matches
   return [hits, line];
 }
-
 // Find common prefix among an array of strings
 function findCommonPrefix(strings) {
   if (strings.length === 0) return "";
