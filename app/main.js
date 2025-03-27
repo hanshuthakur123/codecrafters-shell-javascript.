@@ -146,7 +146,19 @@ function execCmd(command, callback) {
     }
   }
 }
-
+function getMatchingCommands(line) {
+    const paths = PATH.split(":");
+    let commands = [];
+    for (let path of paths) {
+      if (!fs.existsSync(path)) {
+        continue;
+      }
+      const fileNames = fs.readdirSync(path);
+      commands = commands.concat(fileNames);
+    }
+    return commands;
+  }
+  
 function getCmd(answer) {
   let args = [];
   let currentArg = "";
