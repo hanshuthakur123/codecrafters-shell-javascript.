@@ -114,13 +114,7 @@ function printType(cmdName) {
   if (!found) {
     console.log(`${cmdName}: not found`);
   }
-}const readline = require("readline");
-const { exit, cwd, chdir } = require("process");
-const fs = require("fs");
-const path = require("path");
-const { execFileSync } = require("child_process");
-
-const builtins = ["exit", "type", "echo", "pwd"];
+}
 // ✅ Function to find command type (builtin or external)
 function findType(command) {
   let found = false;
