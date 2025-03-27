@@ -35,18 +35,18 @@ function completer(line) {
     if (hits.length === 0) {
       // No matches, return nothing
       process.stdout.write('\x07');
-      return [[] , line];
+      return [[],line];
       
     }
   
    
     if (hits.length === 1  && hits[0] === line) {
       // If there's only one match, append a space after the autocompleted command
-      return [[hits[0]], line];
+      return [[hits[0]],line];
     }
     if (hits.length === 1) {
       // If there's only one match, append a space after the autocompleted command
-      return [[hits[0]+' '], line];
+      return [[hits[0]+' '],line];
     }
     // Find the common prefix among all matches
     const commonPrefix = findCommonPrefix(hits);
