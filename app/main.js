@@ -24,6 +24,7 @@ rl.on("line", (input) => {
     rl.prompt();
   });
 });
+
 function completer(line) {
     const allCommands = getMatchingCommands(line);
     // Use Set to remove duplicates
