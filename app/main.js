@@ -1,204 +1,345 @@
-const readline = require("readline");
+const readline = require("readline/promises");
+const path = require("path");
+const os = require("os");
 const fs = require("fs");
-const { execSync } = require("child_process");
-
+const { execFileSync, spawnSync } = require("node:child_process");
+const HOMEDIR = process.env.HOME || process.env.USERPROFILE || os.homedir();
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    completer: completer // Add autocompletion support
+    completer: completer,
+    prompt: "$ ",
 });
-
-const validCommands = ['echo', 'exit', 'type', 'pwd', 'cd'];
-
-const isExitCommand = (command) => {
-    return command === 'exit 0';
-};
-
-const isEchoCommand = (command) => {
-    return command.startsWith('echo ');
-};
-
-const isTypeCommand = (command) => {
-    return command.startsWith('type ');
-};
-
-const isPwdCommand = (command) => {
-    return command === 'pwd';
-};
-
-const isCdCommand = (command) => {
-    return command.startsWith("cd ");
-};
-
-function extractArgs(command) {
-    const commandName = command.split(" ")[0];
-    const args = command.slice(commandName.length + 1);
-    let quoteIndex = 0;
-    let charValue = '';
-    let quoteChar = '';
-    const elements = [];
-    for (const value of args) {
-        if (!quoteChar && (value === `'` || value === `"`)) {
-            quoteChar = value;
-        }
-        if (quoteChar && quoteIndex % 2 === 0) {
-            quoteIndex++;
-            quoteChar = value;
-        } else if (value === quoteChar && quoteIndex % 2 !== 0) {
-            quoteIndex++;
-            quoteChar = '';
-        } else if (value === ' ' && quoteIndex % 2 === 0) {
-            elements.push(charValue);
-            charValue = '';
-        } else {
-            charValue += value;
-        }
-    }
-    elements.push(charValue);
-    return { commandName, args: elements.filter((o) => o) };
-}
-
-const isValidExec = (command) => {
-    const paths = process.env.PATH ? process.env.PATH.split(':') : [];
-    let filePath = '';
-    paths.some((path) => {
-        const fileName = `${path}/${command}`;
-        return fs.existsSync(fileName) ? (filePath = fileName) : false;
-    });
-    return filePath;
-};
-
-const handleExecutables = (command) => {
-    const { commandName } = extractArgs(command);
-    const filePath = isValidExec(commandName);
-    if (filePath) {
-        const output = execSync(command);
-        process.stdout.write(output);
-    } else {
-        console.log(`${command}: command not found`);
-    }
-};
-
-const handleTypeCommand = (command) => {
-    const { args } = extractArgs(command);
-    const commandName = args[0];
-    if (validCommands.includes(commandName)) {
-        return console.log(`${commandName} is a shell builtin`);
-    }
-    const filePath = isValidExec(commandName);
-    if (!filePath) {
-        console.log(`${commandName}: not found`);
-    } else {
-        console.log(`${commandName} is ${filePath}`);
-    }
-};
-
-const handleCdCommand = (command) => {
-    const { commandName, args } = extractArgs(command);
-    const path = args[0];
-    try {
-        if (path.includes("~")) {
-            process.chdir(path.replace("~", process.env.HOME || ''));
-        } else {
-            process.chdir(path);
-        }
-    } catch (error) {
-        console.log(`${commandName}: ${args}: No such file or directory`);
-    }
-};
-
-const handleEchoCommand = (command) => {
-    const { args } = extractArgs(command);
-    console.log(args.join(" "));
-};
-
-const handleCommands = (command) => {
-    if (isEchoCommand(command)) {
-        handleEchoCommand(command);
-    } else if (isExitCommand(command)) {
-        rl.close();
-        return true;
-    } else if (isTypeCommand(command)) {
-        handleTypeCommand(command);
-    } else if (isPwdCommand(command)) {
-        console.log(process.cwd());
-    } else if (isCdCommand(command)) {
-        handleCdCommand(command);
-    } else {
-        handleExecutables(command);
-    }
-    return false;
-};
-
-// Autocompletion function for Stage #TG6
-function completer(line) {
-    const input = line.trim();
-    const commands = [...validCommands, ...getExternalCommands()];
-    const hits = commands.filter((c) => c.startsWith(input)).sort();
-
-    if (hits.length === 0) {
-        return [[], line]; // No matches
-    }
-
-    if (hits.length === 1) {
-        return [[hits[0] + " "], line]; // Single match, add space
-    }
-
-    // Multiple matches: find common prefix and list all if no further completion
-    const commonPrefix = findCommonPrefix(hits);
-    if (commonPrefix && commonPrefix.length > input.length) {
-        return [[commonPrefix], line]; // Complete to common prefix
-    }
-
-    // Display all matches if TAB pressed and no unique completion
-    console.log("\n" + hits.join("  "));
-    rl.write(null, { ctrl: true, name: 'u' }); // Clear current line
-    rl.write(line); // Restore original input
-    return [hits, line];
-}
-
-// Helper to get external commands from PATH
-function getExternalCommands() {
-    const paths = process.env.PATH ? process.env.PATH.split(':') : [];
-    const commands = new Set();
-    for (let p of paths) {
-        if (fs.existsSync(p)) {
-            const files = fs.readdirSync(p);
-            files.forEach((file) => {
-                const fullPath = `${p}/${file}`;
-                if (fs.statSync(fullPath).isFile()) {
-                    commands.add(file);
-                }
-            });
-        }
-    }
-    return Array.from(commands);
-}
-
-// Helper to find common prefix among matches
-function findCommonPrefix(strings) {
+let lastTabInput = "";
+let tabPressCount = 0;
+function longestCommonPrefix(strings) {
     if (strings.length === 0) return "";
-    if (strings.length === 1) return strings[0];
     let prefix = strings[0];
     for (let i = 1; i < strings.length; i++) {
-        let j = 0;
-        while (j < prefix.length && j < strings[i].length && prefix[j] === strings[i][j]) {
-            j++;
+        while (strings[i].indexOf(prefix) !== 0) {
+            prefix = prefix.slice(0, -1);
+            if (prefix === "") return "";
         }
-        prefix = prefix.substring(0, j);
-        if (prefix === "") break;
     }
     return prefix;
 }
-
-const askQuestion = () => {
-    rl.question("$ ", (command) => {
-        if (handleCommands(command)) {
-            return;
-        } else {
-            askQuestion();
+function completer(line) {
+    const builtins = ["exit", "echo", "type", "pwd", "cd", "cat"];
+    const paths = process.env.PATH.split(":");
+    const executables = new Set();
+    // Collect executable files from PATH directories
+    for (const dir of paths) {
+        try {
+            const files = fs.readdirSync(dir);
+            for (const file of files) {
+                const fullPath = path.join(dir, file);
+                try {
+                    fs.accessSync(fullPath, fs.constants.X_OK);
+                    const stats = fs.statSync(fullPath);
+                    if (stats.isFile()) {
+                        executables.add(file);
+                    }
+                } catch (e) {
+                    // Skip non-executable files
+                }
+            }
+        } catch (e) {
+            // Skip inaccessible directories
         }
+    }
+    const allCommands = [...builtins, ...executables].sort();
+    const currentInput = line.trim();
+    const hits = allCommands
+        .filter((cmd) => cmd.startsWith(currentInput))
+        .sort();
+    if (hits.length === 0) {
+        process.stdout.write("\x07");
+        return [[], line];
+    }
+    const lcp = longestCommonPrefix(hits);
+    if (lcp.length > currentInput.length) {
+        const hasLongerCommands = hits.some(
+            (cmd) => cmd.startsWith(lcp) && cmd.length > lcp.length
+        );
+        if (hasLongerCommands) {
+            // Complete to LCP without space
+            return [[lcp], line];
+        } else {
+            // Complete to LCP with space
+            return [[lcp + " "], line];
+        }
+    } else {
+        if (hits.length === 1) {
+            return [[hits[0] + " "], line];
+        } else {
+            // Handle multiple matches
+            if (currentInput === lastTabInput && tabPressCount === 1) {
+                // Show matches
+                process.stdout.write("\n" + hits.join("  ") + "\n");
+                rl.prompt(true);
+                lastTabInput = "";
+                tabPressCount = 0;
+                return [[], line];
+            } else {
+                // Ring bell for first tab
+                process.stdout.write("\x07");
+                lastTabInput = currentInput;
+                tabPressCount = 1;
+                return [[], line];
+            }
+        }
+    }
+}
+/**
+ * parseArgs: split the input into arguments following POSIX-like quoting rules.
+ *
+ * Rules:
+ * - Outside quotes, a backslash escapes the next character.
+ * - Inside double quotes, a backslash only escapes $, `, ", \, or newline.
+ * - Inside single quotes, everything is literal.
+ */
+function parseArgs(input) {
+    let args = [];
+    let current = [];
+    let inSingle = false;
+    let inDouble = false;
+    let escapeNext = false;
+    for (let i = 0; i < input.length; i++) {
+        let ch = input[i];
+        if (escapeNext) {
+            if (inDouble) {
+                // In double quotes, only these characters are specially escaped.
+                if (
+                    ch === "$" ||
+                    ch === "`" ||
+                    ch === '"' ||
+                    ch === "\\" ||
+                    ch === "\n"
+                ) {
+                    current.push(ch);
+                } else {
+                    // Otherwise, leave the backslash in.
+                    current.push("\\", ch);
+                }
+            } else {
+                current.push(ch);
+            }
+            escapeNext = false;
+            continue;
+        }
+        if (ch === "\\") {
+            // If in single quotes, backslash is literal.
+            if (inSingle) {
+                current.push(ch);
+            } else {
+                escapeNext = true;
+            }
+            continue;
+        }
+        if (ch === "'" && !inDouble) {
+            inSingle = !inSingle;
+            continue; // do not include the outer single quotes
+        }
+        if (ch === '"' && !inSingle) {
+            inDouble = !inDouble;
+            continue; // do not include the outer double quotes
+        }
+        if (ch === " " && !inSingle && !inDouble) {
+            if (current.length > 0) {
+                args.push(current.join(""));
+                current = [];
+            }
+            continue;
+        }
+        current.push(ch);
+    }
+    if (current.length > 0) {
+        args.push(current.join(""));
+    }
+    return args;
+}
+function handleRedirect(answer) {
+    // Determine which redirection operator is present.
+    const parts = parseArgs(answer);
+    const operators = ["2>>", "1>>", "2>", "1>", ">>", ">"];
+    let op = null;
+    let opIndex = -1;
+    // Find the last valid operator in the parsed arguments
+    for (let i = 0; i < parts.length; i++) {
+        if (operators.includes(parts[i])) {
+            op = parts[i];
+            opIndex = i;
+        }
+    }
+    if (!op || opIndex === parts.length - 1) return;
+    const filename = parts[opIndex + 1];
+    const commandParts = parts.slice(0, opIndex);
+    if (commandParts.length === 0) return;
+    // Determine operation parameters
+    const isAppend = op.endsWith(">>");
+    const isStderr = op.startsWith("2");
+    const flag = isAppend ? "a" : "w";
+    // Execute command
+    const result = spawnSync(commandParts[0], commandParts.slice(1), {
+        encoding: "utf-8",
+        stdio: ["inherit", "pipe", "pipe"],
     });
-};
-
-askQuestion();
+    try {
+        // Always create directory structure
+        fs.mkdirSync(path.dirname(filename), { recursive: true });
+        // Get content to write (empty string if undefined)
+        const content = (isStderr ? result.stderr : result.stdout) || "";
+        // Always write to file (creates empty file if needed)
+        fs.writeFileSync(filename, content, {
+            flag: flag,
+            mode: 0o644,
+        });
+        // Print non-redirected output to console
+        const consoleStream = isStderr ? process.stdout : process.stderr;
+        const consoleOutput = isStderr ? result.stdout : result.stderr;
+        if (consoleOutput) {
+            consoleStream.write(consoleOutput);
+        }
+    } catch (err) {
+        process.stderr.write(
+            `${commandParts[0]}: ${filename}: ${err.message}\n`
+        );
+    }
+}
+// ----- Command Handlers -----
+function handleEcho(answer) {
+    const parts = parseArgs(answer);
+    const output = parts.slice(1).join(" ");
+    // Use process.stdout instead of rl.write()
+    process.stdout.write(output + "\n");
+}
+function handleInvalid(answer) {
+    process.stdout.write(`${answer}: command not found\n`);
+}
+function handleExit() {
+    rl.close();
+}
+function handleType(answer) {
+    const parts = parseArgs(answer);
+    const command = parts[1];
+    const builtins = ["exit", "echo", "type", "pwd"];
+    if (builtins.includes(command.toLowerCase())) {
+        process.stdout.write(`${command} is a shell builtin\n`);
+    } else {
+        const paths = process.env.PATH.split(":");
+        for (const p of paths) {
+            let destPath = path.join(p, command);
+            if (fs.existsSync(destPath) && fs.statSync(destPath).isFile()) {
+                process.stdout.write(`${command} is ${destPath}\n`);
+                return;
+            }
+        }
+        process.stdout.write(`${command}: not found\n`);
+    }
+}
+function handleFile(answer) {
+    // Use parseArgs to handle any quoting in the command name
+    const parts = parseArgs(answer);
+    const executable = parts[0]; // the command name (may be quoted)
+    const args = parts.slice(1);
+    const paths = process.env.PATH.split(":");
+    for (const pathEnv of paths) {
+        let destPath = path.join(pathEnv, executable);
+        if (fs.existsSync(destPath) && fs.statSync(destPath).isFile()) {
+            // Use argv0 option so that the child process sees the bare command name.
+            execFileSync(destPath, args, {
+                encoding: "utf-8",
+                stdio: "inherit",
+                argv0: executable,
+            });
+            return;
+        }
+    }
+    //console.log(`${executable}: command not found`);
+}
+function handleReadFile(answer) {
+    const args = parseArgs(answer).slice(1); // Extract file paths (excluding "cat")
+    if (args.length === 0) {
+        console.error("cat: missing file operand");
+        return;
+    }
+    for (const filePath of args) {
+        try {
+            const data = fs.readFileSync(filePath, "utf-8");
+            process.stdout.write(data);
+        } catch (err) {
+            if (err.code === "ENOENT") {
+                console.error(`cat: ${filePath}: No such file or directory`);
+            } else {
+                console.error(`cat: ${filePath}: Permission denied`);
+            }
+        }
+    }
+}
+function handlePWD() {
+    process.stdout.write(`${process.cwd()}\n`);
+}
+function handleChangeDirectory(answer) {
+    const parts = parseArgs(answer);
+    const directory = parts[1];
+    try {
+        if (directory === "~") {
+            process.chdir(HOMEDIR);
+        } else {
+            process.chdir(directory);
+        }
+        rl.prompt();
+    } catch (err) {
+        process.stdout.write(`cd: ${directory}: No such file or directory\n`);
+    }
+}
+// Attach a one-time event listener (it remains active)
+function handleInput(line) {
+    if (line.startsWith("invalid")) {
+        handleInvalid(line);
+        rl.prompt();
+        return;
+    }
+    const parts = parseArgs(line);
+    if (parts.length === 0) {
+        rl.prompt();
+        return;
+    }
+    const cmd = parts[0]?.toLowerCase();
+    const redirectOperators = ["2>>", "1>>", "2>", "1>", ">>", ">"];
+    const foundOperator = redirectOperators.find((op) => parts.includes(op));
+    if (foundOperator) {
+        handleRedirect(line);
+    } else {
+        switch (cmd) {
+            case "exit":
+                handleExit();
+                break;
+            case "echo":
+                handleEcho(line);
+                break;
+            case "type":
+                handleType(line);
+                break;
+            case "pwd":
+                handlePWD();
+                break;
+            case "cd":
+                handleChangeDirectory(line);
+                break;
+            case "cat":
+                handleReadFile(line);
+                break;
+            default:
+                handleFile(line);
+        }
+    }
+    rl.prompt();
+}
+rl.on("line", handleInput);
+// Optionally handle close event:
+rl.on("close", () => {
+    process.exit(0);
+});
+// ----- Main REPL Loop -----
+rl.prompt();
